@@ -125,16 +125,18 @@ const Home = () => {
                       src={featuredAnnouncement.imageUrl} 
                       alt={featuredAnnouncement.title}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
                     />
-                  ) : (
-                    <>
-                      <div className="absolute inset-0 opacity-20">
-                        <div className="absolute inset-0" style={{
-                          backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40'/%3E%3C/g%3E%3C/svg%3E")`,
-                        }}></div>
-                      </div>
-                      <span className="text-white text-6xl opacity-50">📢</span>
-                    </>
+                  ) : null}
+                  <div className="absolute inset-0 opacity-20">
+                    <div className="absolute inset-0" style={{
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40'/%3E%3C/g%3E%3C/svg%3E")`,
+                    }}></div>
+                  </div>
+                  {!featuredAnnouncement.imageUrl && (
+                    <span className="text-white text-6xl opacity-50 relative z-10">📢</span>
                   )}
                 </div>
                 
