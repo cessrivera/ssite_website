@@ -24,7 +24,6 @@ export const AuthProvider = ({ children }) => {
   const [userData, setUserData] = useState(null); // Full user data from Firestore
   const [loading, setLoading] = useState(true);
 
-  // Sign in with email and password
   const login = async (email, password) => {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
@@ -34,7 +33,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Sign out
   const logout = async () => {
     try {
       await signOut(auth);
@@ -46,18 +44,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Register new member
   const register = async (email, password, userData) => {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       
-      // Create user document in Firestore
       await setDoc(doc(db, 'users', result.user.uid), {
         email: email,
-        role: 'member', // Default role
+        role: 'member',
         ...userData,
         createdAt: new Date().toISOString(),
-        status: 'pending' // Pending approval
+        status: 'active'
       });
       
       return { success: true, user: result.user };
@@ -66,7 +62,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Fetch user data from Firestore
   const fetchUserData = async (uid) => {
     try {
       const userDoc = await getDoc(doc(db, 'users', uid));
@@ -84,7 +79,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);

@@ -42,9 +42,10 @@ const Membership = () => {
     try {
       // Create user in Firebase Auth
       const result = await register(formData.email, formData.password, {
-        fullName: formData.fullName,
-        studentNumber: formData.studentNumber,
-        yearLevel: formData.yearLevel,
+        name: formData.fullName,
+        studentId: formData.studentNumber,
+        year: formData.yearLevel,
+        course: 'BSIT',
         role: 'member'
       });
 
@@ -52,9 +53,10 @@ const Membership = () => {
         // Create member record in members collection
         await createMember({
           userId: result.user.uid,
-          studentNumber: formData.studentNumber,
-          fullName: formData.fullName,
-          yearLevel: formData.yearLevel,
+          studentId: formData.studentNumber,
+          name: formData.fullName,
+          year: formData.yearLevel,
+          course: 'BSIT',
           email: formData.email,
           status: 'active'
         });
