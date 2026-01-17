@@ -93,13 +93,23 @@ const Announcements = () => {
           ) : (
             filteredAnnouncements.map((announcement) => (
             <div key={announcement.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group">
-              {announcement.imageUrl && (
+              {announcement.imageUrl ? (
                 <div className="h-64 overflow-hidden">
                   <img 
                     src={announcement.imageUrl} 
                     alt={announcement.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.parentElement.innerHTML = '<div class="h-64 bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center"><svg class="w-20 h-20 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg></div>';
+                    }}
                   />
+                </div>
+              ) : (
+                <div className="h-64 bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
+                  <svg className="w-20 h-20 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                  </svg>
                 </div>
               )}
               
