@@ -116,7 +116,9 @@ const Polls = () => {
                       <div className="space-y-3">
                         {poll.options?.map((option, idx) => (
                           <div key={idx}>
-                            <label className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all duration-200 ${
+                            <label 
+                              onClick={() => setSelectedOption(idx)}
+                              className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all duration-200 ${
                               selectedOption === idx 
                                 ? 'bg-blue-50 border-2 border-blue-500' 
                                 : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'

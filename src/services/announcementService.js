@@ -1,4 +1,3 @@
-// Firestore helper functions for Announcements
 import { 
   collection, 
   addDoc, 
@@ -15,7 +14,6 @@ import { db } from '../config/firebase';
 
 const COLLECTION = 'announcements';
 
-// Get all announcements
 export const getAnnouncements = async () => {
   try {
     const q = query(collection(db, COLLECTION), orderBy('createdAt', 'desc'));
@@ -27,7 +25,6 @@ export const getAnnouncements = async () => {
   }
 };
 
-// Get single announcement
 export const getAnnouncement = async (id) => {
   try {
     const docRef = doc(db, COLLECTION, id);
@@ -42,7 +39,6 @@ export const getAnnouncement = async (id) => {
   }
 };
 
-// Create announcement
 export const createAnnouncement = async (data) => {
   try {
     const docRef = await addDoc(collection(db, COLLECTION), {
@@ -57,7 +53,6 @@ export const createAnnouncement = async (data) => {
   }
 };
 
-// Update announcement
 export const updateAnnouncement = async (id, data) => {
   try {
     const docRef = doc(db, COLLECTION, id);
@@ -71,7 +66,6 @@ export const updateAnnouncement = async (id, data) => {
   }
 };
 
-// Delete announcement
 export const deleteAnnouncement = async (id) => {
   try {
     await deleteDoc(doc(db, COLLECTION, id));

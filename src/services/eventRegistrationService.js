@@ -13,7 +13,6 @@ import {
 
 const registrationsCollection = collection(db, 'eventRegistrations');
 
-// Register for an event
 export const registerForEvent = async (registrationData) => {
   try {
     const docRef = await addDoc(registrationsCollection, {
@@ -28,7 +27,6 @@ export const registerForEvent = async (registrationData) => {
   }
 };
 
-// Get all registrations for an event
 export const getEventRegistrations = async (eventId) => {
   try {
     const q = query(
@@ -47,7 +45,6 @@ export const getEventRegistrations = async (eventId) => {
   }
 };
 
-// Get user's registrations
 export const getUserRegistrations = async (userId) => {
   try {
     const q = query(
@@ -66,7 +63,6 @@ export const getUserRegistrations = async (userId) => {
   }
 };
 
-// Check if user is already registered
 export const isUserRegistered = async (userId, eventId) => {
   try {
     const q = query(
@@ -82,7 +78,6 @@ export const isUserRegistered = async (userId, eventId) => {
   }
 };
 
-// Delete a registration
 export const deleteRegistration = async (id) => {
   try {
     await deleteDoc(doc(db, 'eventRegistrations', id));

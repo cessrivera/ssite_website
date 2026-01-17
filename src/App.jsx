@@ -4,7 +4,6 @@ import Layout from './components/layout/Layout';
 import { AdminRoute } from './components/auth/ProtectedRoute';
 import AdminLayout from './components/admin/AdminLayout';
 
-// Public Pages
 import Home from './pages/Home';
 import Announcements from './pages/Announcements';
 import Events from './pages/Events';
@@ -14,7 +13,6 @@ import Contact from './pages/Contact';
 import Membership from './pages/Membership';
 import Login from './pages/Login';
 
-// Admin Pages
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminAnnouncements from './pages/admin/Announcements';
 import AdminEvents from './pages/admin/Events';
@@ -29,7 +27,6 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          {/* Public Routes */}
           <Route path="/" element={<Layout><Home /></Layout>} />
           <Route path="/announcements" element={<Layout><Announcements /></Layout>} />
           <Route path="/events" element={<Layout><Events /></Layout>} />
@@ -39,7 +36,6 @@ function App() {
           <Route path="/membership" element={<Layout><Membership /></Layout>} />
           <Route path="/login" element={<Layout><Login /></Layout>} />
 
-          {/* Admin Routes */}
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
             <Route index element={<AdminDashboard />} />
             <Route path="announcements" element={<AdminAnnouncements />} />

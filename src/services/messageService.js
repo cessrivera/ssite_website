@@ -12,7 +12,6 @@ import {
 
 const messagesCollection = collection(db, 'messages');
 
-// Create a new message
 export const createMessage = async (messageData) => {
   try {
     const docRef = await addDoc(messagesCollection, {
@@ -27,7 +26,6 @@ export const createMessage = async (messageData) => {
   }
 };
 
-// Get all messages
 export const getMessages = async () => {
   try {
     const q = query(messagesCollection, orderBy('createdAt', 'desc'));
@@ -43,7 +41,6 @@ export const getMessages = async () => {
   }
 };
 
-// Delete a message
 export const deleteMessage = async (id) => {
   try {
     await deleteDoc(doc(db, 'messages', id));

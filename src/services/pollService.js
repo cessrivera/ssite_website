@@ -1,4 +1,3 @@
-// Firestore helper functions for Polls
 import { 
   collection, 
   addDoc, 
@@ -14,7 +13,6 @@ import { db } from '../config/firebase';
 
 const COLLECTION = 'polls';
 
-// Get all polls
 export const getPolls = async () => {
   try {
     const q = query(collection(db, COLLECTION), orderBy('createdAt', 'desc'));
@@ -26,7 +24,6 @@ export const getPolls = async () => {
   }
 };
 
-// Create poll
 export const createPoll = async (data) => {
   try {
     const docRef = await addDoc(collection(db, COLLECTION), {
@@ -42,7 +39,6 @@ export const createPoll = async (data) => {
   }
 };
 
-// Update poll
 export const updatePoll = async (id, data) => {
   try {
     const docRef = doc(db, COLLECTION, id);
@@ -56,7 +52,6 @@ export const updatePoll = async (id, data) => {
   }
 };
 
-// Vote on poll
 export const votePoll = async (pollId, optionIndex, userId) => {
   try {
     const pollRef = doc(db, COLLECTION, pollId);
@@ -93,7 +88,6 @@ export const votePoll = async (pollId, optionIndex, userId) => {
   }
 };
 
-// Delete poll
 export const deletePoll = async (id) => {
   try {
     await deleteDoc(doc(db, COLLECTION, id));

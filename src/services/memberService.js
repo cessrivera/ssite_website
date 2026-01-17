@@ -1,4 +1,3 @@
-// Firestore helper functions for Members
 import { 
   collection, 
   addDoc, 
@@ -16,7 +15,6 @@ import { db } from '../config/firebase';
 
 const COLLECTION = 'members';
 
-// Get all members
 export const getMembers = async () => {
   try {
     const q = query(collection(db, COLLECTION), orderBy('createdAt', 'desc'));
@@ -28,7 +26,6 @@ export const getMembers = async () => {
   }
 };
 
-// Get single member by ID
 export const getMember = async (id) => {
   try {
     const docRef = doc(db, COLLECTION, id);
@@ -43,7 +40,6 @@ export const getMember = async (id) => {
   }
 };
 
-// Get member by user ID
 export const getMemberByUserId = async (userId) => {
   try {
     const q = query(collection(db, COLLECTION), where('userId', '==', userId));
@@ -59,7 +55,6 @@ export const getMemberByUserId = async (userId) => {
   }
 };
 
-// Create member
 export const createMember = async (data) => {
   try {
     const docRef = await addDoc(collection(db, COLLECTION), {
@@ -74,7 +69,6 @@ export const createMember = async (data) => {
   }
 };
 
-// Update member
 export const updateMember = async (id, data) => {
   try {
     const docRef = doc(db, COLLECTION, id);
@@ -88,7 +82,6 @@ export const updateMember = async (id, data) => {
   }
 };
 
-// Delete member
 export const deleteMember = async (id) => {
   try {
     await deleteDoc(doc(db, COLLECTION, id));

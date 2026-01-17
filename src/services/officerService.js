@@ -1,4 +1,3 @@
-// Firestore helper functions for Officers
 import { 
   collection, 
   addDoc, 
@@ -14,7 +13,6 @@ import { db } from '../config/firebase';
 
 const COLLECTION = 'officers';
 
-// Get all officers
 export const getOfficers = async () => {
   try {
     const q = query(collection(db, COLLECTION), orderBy('order', 'asc'));
@@ -26,7 +24,6 @@ export const getOfficers = async () => {
   }
 };
 
-// Create officer
 export const createOfficer = async (data) => {
   try {
     const docRef = await addDoc(collection(db, COLLECTION), {
@@ -41,7 +38,6 @@ export const createOfficer = async (data) => {
   }
 };
 
-// Update officer
 export const updateOfficer = async (id, data) => {
   try {
     const docRef = doc(db, COLLECTION, id);
@@ -55,7 +51,6 @@ export const updateOfficer = async (id, data) => {
   }
 };
 
-// Delete officer
 export const deleteOfficer = async (id) => {
   try {
     await deleteDoc(doc(db, COLLECTION, id));

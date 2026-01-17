@@ -1,4 +1,3 @@
-// Firestore helper functions for Events
 import { 
   collection, 
   addDoc, 
@@ -14,7 +13,6 @@ import { db } from '../config/firebase';
 
 const COLLECTION = 'events';
 
-// Get all events
 export const getEvents = async () => {
   try {
     const q = query(collection(db, COLLECTION), orderBy('date', 'asc'));
@@ -26,7 +24,6 @@ export const getEvents = async () => {
   }
 };
 
-// Create event
 export const createEvent = async (data) => {
   try {
     const docRef = await addDoc(collection(db, COLLECTION), {
@@ -41,7 +38,6 @@ export const createEvent = async (data) => {
   }
 };
 
-// Update event
 export const updateEvent = async (id, data) => {
   try {
     const docRef = doc(db, COLLECTION, id);
@@ -55,7 +51,6 @@ export const updateEvent = async (id, data) => {
   }
 };
 
-// Delete event
 export const deleteEvent = async (id) => {
   try {
     await deleteDoc(doc(db, COLLECTION, id));
