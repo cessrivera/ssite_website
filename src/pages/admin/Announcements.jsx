@@ -35,14 +35,17 @@ const AdminAnnouncements = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('Submitting form data:', formData);
     try {
       if (editingAnnouncement) {
+        console.log('Updating announcement:', editingAnnouncement.id, formData);
         await updateAnnouncement(editingAnnouncement.id, formData);
       } else {
         await createAnnouncement(formData);
       }
       resetForm();
       loadAnnouncements();
+      alert('Announcement saved successfully!');
     } catch (error) {
       console.error('Error saving announcement:', error);
       alert('Error saving announcement. Please try again.');

@@ -34,6 +34,16 @@ const Home = () => {
   const latestAnnouncements = announcements.slice(0, 3);
   const featuredAnnouncement = announcements.length > 0 ? announcements[0] : null;
 
+  useEffect(() => {
+    if (featuredAnnouncement) {
+      console.log('Featured Announcement:', featuredAnnouncement);
+      console.log('Image URL:', featuredAnnouncement.imageUrl);
+      console.log('Image URL type:', typeof featuredAnnouncement.imageUrl);
+      console.log('Image URL length:', featuredAnnouncement.imageUrl?.length);
+      console.log('Trimmed URL:', featuredAnnouncement.imageUrl?.trim());
+    }
+  }, [featuredAnnouncement]);
+
   return (
     <div className="bg-gray-50">
       {/* Hero Section */}
@@ -118,27 +128,23 @@ const Home = () => {
           {featuredAnnouncement ? (
             <div className="bg-gradient-to-br from-gray-50 to-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="grid md:grid-cols-2 gap-0">
-                {/* Image */}
-                <div className="h-64 md:h-auto bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center relative overflow-hidden">
-                  {featuredAnnouncement.imageUrl ? (
+                {featuredAnnouncement.imageUrl && featuredAnnouncement.imageUrl.trim() !== '' ? (
+                  <div className="h-64 md:h-auto overflow-hidden">
                     <img 
                       src={featuredAnnouncement.imageUrl} 
                       alt={featuredAnnouncement.title}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        e.target.style.display = 'none';
+                        console.error('Image failed to load:', featuredAnnouncement.imageUrl);
+                        e.target.parentElement.innerHTML = '<div class="h-64 md:h-auto bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center"><span class="text-white text-6xl opacity-50">📢</span></div>';
                       }}
                     />
-                  ) : null}
-                  <div className="absolute inset-0 opacity-20">
-                    <div className="absolute inset-0" style={{
-                      backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40'/%3E%3C/g%3E%3C/svg%3E")`,
-                    }}></div>
                   </div>
-                  {!featuredAnnouncement.imageUrl && (
-                    <span className="text-white text-6xl opacity-50 relative z-10">📢</span>
-                  )}
-                </div>
+                ) : (
+                  <div className="h-64 md:h-auto bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center">
+                    <span className="text-white text-6xl opacity-50">📢</span>
+                  </div>
+                )}
                 
                 {/* Content */}
                 <div className="p-8 md:p-10 flex flex-col justify-center">

@@ -104,7 +104,7 @@ const AdminLayout = () => {
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link to="/" className="flex items-center gap-3">
-              <img src="/ua-logo.svg" alt="UA Logo" className="w-12 h-12" />
+              <img src="/citcls-logo.png" alt="CITCLS Logo" className="w-12 h-12" />
               <div className="hidden sm:block">
                 <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">SSITE</h1>
                 <p className="text-xs text-gray-500">Student Society on Information Technology Education</p>

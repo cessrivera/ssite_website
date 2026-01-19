@@ -54,7 +54,7 @@ const Navbar = () => {
         <div className="flex justify-between items-center h-18 py-3">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
-            <img src="/ua-logo.svg" alt="UA Logo" className="w-14 h-14 transition-transform group-hover:scale-105" />
+            <img src="/citcls-logo.png" alt="CITCLS Logo" className="w-14 h-14 transition-transform group-hover:scale-105" />
             <div className="hidden sm:block">
               <h1 className="text-xl font-bold text-blue-900 tracking-tight">SSITE</h1>
               <p className="text-xs text-gray-500">Student Society on Information Technology Education</p>
