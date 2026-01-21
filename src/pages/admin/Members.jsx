@@ -237,8 +237,7 @@ const AdminMembers = () => {
                         <>
                           <button
                             onClick={() => {
-                              const newRole = member.role === 'admin' ? 'member' : 'admin';
-                              handleUpdateRole(member.id, newRole);
+                              alert('Member information editing feature coming soon!');
                             }}
                             className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1"
                           >

@@ -161,7 +161,7 @@ const Events = () => {
                   <div
                     key={day}
                     className={`text-center py-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                      day === today ? 'bg-gradient-to-br from-blue-900 to-blue-700 text-white font-bold shadow-lg' :
+                      day === today && !eventDays.includes(day) ? 'bg-gray-200 text-gray-900 font-bold' :
                       eventDays.includes(day) ? 'bg-blue-100 text-blue-900 font-semibold hover:bg-blue-200' :
                       'hover:bg-gray-100'
                     }`}
