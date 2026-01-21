@@ -31,11 +31,13 @@ const AdminDashboard = () => {
         getPolls()
       ]);
 
-      // Get members count
+      // Get members count (excluding admins)
       const membersSnapshot = await getDocs(collection(db, 'users'));
+      const membersList = membersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const nonAdminMembers = membersList.filter(m => m.role !== 'admin');
       
       setStats({
-        members: membersSnapshot.size,
+        members: nonAdminMembers.length,
         announcements: announcements.length,
         events: events.length,
         polls: polls.filter(p => p.active).length
