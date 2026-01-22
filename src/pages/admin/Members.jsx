@@ -139,16 +139,16 @@ const AdminMembers = () => {
   };
 
   const filteredMembers = members
-    .filter(member => member.role !== 'admin')
+    .filter(member => (member.role || 'member') !== 'admin')
     .filter(member =>
       member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.studentId?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-  const totalMembers = members.filter(m => m.role !== 'admin').length;
-  const pendingMembers = members.filter(m => m.status === 'pending' && m.role !== 'admin').length;
-  const activeMembers = members.filter(m => m.status === 'active' && m.role !== 'admin').length;
+  const totalMembers = members.filter(m => (m.role || 'member') !== 'admin').length;
+  const pendingMembers = members.filter(m => m.status === 'pending' && (m.role || 'member') !== 'admin').length;
+  const activeMembers = members.filter(m => m.status === 'active' && (m.role || 'member') !== 'admin').length;
 
   const getStatusBadge = (status) => {
     if (status === 'active') return 'bg-green-100 text-green-700';
