@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { deleteMemberCompletely } from '../../services/memberDeletionService';
 
 const AdminMembers = () => {
   const [members, setMembers] = useState([]);
@@ -65,23 +64,13 @@ const AdminMembers = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to DELETE this member permanently? They will be able to register again if they wish.')) {
-      setLoading(true);
+    if (window.confirm('Are you sure you want to delete this member?')) {
       try {
-        // Use Cloud Function to delete from both Auth and Firestore
-        const result = await deleteMemberCompletely(id);
-        
-        if (result.success) {
-          loadMembers();
-          alert('Member deleted successfully! All data including authentication has been removed.');
-        } else {
-          alert('Error: ' + result.error);
-        }
+        await deleteDoc(doc(db, 'members', id));
+        loadMembers();
       } catch (error) {
         console.error('Error deleting member:', error);
         alert('Failed to delete member. Please try again.');
-      } finally {
-        setLoading(false);
       }
     }
   };
