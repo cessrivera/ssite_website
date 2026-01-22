@@ -12,6 +12,7 @@ import Polls from './pages/Polls';
 import Contact from './pages/Contact';
 import Membership from './pages/Membership';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
 
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminAnnouncements from './pages/admin/Announcements';
@@ -35,6 +36,7 @@ function App() {
           <Route path="/contact" element={<Layout><Contact /></Layout>} />
           <Route path="/membership" element={<Layout><Membership /></Layout>} />
           <Route path="/login" element={<Layout><Login /></Layout>} />
+          <Route path="/forgot-password" element={<Layout><ForgotPassword /></Layout>} />
 
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
             <Route index element={<AdminDashboard />} />
