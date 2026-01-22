@@ -24,7 +24,7 @@ const AdminMembers = () => {
 
   const loadMembers = async () => {
     try {
-      const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+      const q = query(collection(db, 'members'), orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setMembers(data);
@@ -37,7 +37,7 @@ const AdminMembers = () => {
 
   const handleApprove = async (id) => {
     try {
-      await updateDoc(doc(db, 'users', id), { status: 'active' });
+      await updateDoc(doc(db, 'members', id), { status: 'active' });
       loadMembers();
     } catch (error) {
       console.error('Error approving member:', error);
@@ -47,7 +47,7 @@ const AdminMembers = () => {
   const handleReject = async (id) => {
     if (window.confirm('Are you sure you want to reject this member?')) {
       try {
-        await deleteDoc(doc(db, 'users', id));
+        await deleteDoc(doc(db, 'members', id));
         loadMembers();
       } catch (error) {
         console.error('Error rejecting member:', error);
@@ -57,7 +57,7 @@ const AdminMembers = () => {
 
   const handleUpdateRole = async (id, newRole) => {
     try {
-      await updateDoc(doc(db, 'users', id), { role: newRole });
+      await updateDoc(doc(db, 'members', id), { role: newRole });
       loadMembers();
     } catch (error) {
       console.error('Error updating role:', error);
@@ -108,7 +108,7 @@ const AdminMembers = () => {
     
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'users', editingMember.id), {
+      await updateDoc(doc(db, 'members', editingMember.id), {
         name: editFormData.name,
         studentId: editFormData.studentId,
         course: editFormData.course,
