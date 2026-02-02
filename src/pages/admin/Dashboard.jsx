@@ -4,6 +4,7 @@ import { getAnnouncements } from '../../services/announcementService';
 import { getEvents } from '../../services/eventService';
 import { getOfficers } from '../../services/officerService';
 import { getPolls } from '../../services/pollService';
+import { getMembers } from '../../services/memberService';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
@@ -24,20 +25,16 @@ const AdminDashboard = () => {
   const loadDashboardData = async () => {
     try {
       // Load counts
-      const [announcements, events, officers, polls] = await Promise.all([
+      const [announcements, events, officers, polls, members] = await Promise.all([
         getAnnouncements(),
         getEvents(),
         getOfficers(),
-        getPolls()
+        getPolls(),
+        getMembers()
       ]);
-
-      // Get members count (excluding admins)
-      const membersSnapshot = await getDocs(collection(db, 'users'));
-      const membersList = membersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const nonAdminMembers = membersList.filter(m => m.role !== 'admin');
       
       setStats({
-        members: nonAdminMembers.length,
+        members: members.length,
         announcements: announcements.length,
         events: events.length,
         polls: polls.filter(p => p.active).length

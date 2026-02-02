@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
-import { getMessages, deleteMessage } from '../../services/messageService';
+import { getMessages, deleteMessage, replyToMessage, updateMessageStatus } from '../../services/messageService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const AdminMessages = () => {
+  const { currentUser } = useAuth();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedMessage, setSelectedMessage] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     fetchMessages();
@@ -28,6 +32,70 @@ const AdminMessages = () => {
         setMessages(messages.filter(msg => msg.id !== id));
         setSelectedMessage(null);
       }
+    }
+  };
+
+  const handleSelectMessage = async (message) => {
+    setSelectedMessage(message);
+    setReplyText(message.reply || '');
+    
+    // Mark as read if unread
+    if (message.status === 'unread') {
+      await updateMessageStatus(message.id, 'read');
+      setMessages(messages.map(msg => 
+        msg.id === message.id ? { ...msg, status: 'read' } : msg
+      ));
+    }
+  };
+
+  const handleSendReply = async () => {
+    if (!replyText.trim()) {
+      alert('Please enter a reply message');
+      return;
+    }
+
+    setSending(true);
+    try {
+      const result = await replyToMessage(selectedMessage.id, {
+        content: replyText,
+        adminEmail: currentUser?.email || 'Admin'
+      });
+
+      if (result.success) {
+        // Update local state
+        const updatedMessage = { 
+          ...selectedMessage, 
+          reply: replyText, 
+          status: 'replied',
+          repliedAt: new Date(),
+          repliedBy: currentUser?.email || 'Admin'
+        };
+        setSelectedMessage(updatedMessage);
+        setMessages(messages.map(msg => 
+          msg.id === selectedMessage.id ? updatedMessage : msg
+        ));
+        alert('Reply sent successfully!');
+      } else {
+        alert('Error sending reply. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      alert('Error sending reply. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'unread':
+        return <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">Unread</span>;
+      case 'read':
+        return <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full font-medium">Read</span>;
+      case 'replied':
+        return <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">Replied</span>;
+      default:
+        return null;
     }
   };
 
@@ -76,7 +144,7 @@ const AdminMessages = () => {
                 {messages.map((message) => (
                   <div
                     key={message.id}
-                    onClick={() => setSelectedMessage(message)}
+                    onClick={() => handleSelectMessage(message)}
                     className={`p-3 rounded-lg cursor-pointer transition-all border ${
                       selectedMessage?.id === message.id
                         ? 'bg-blue-50 border-blue-200'
@@ -87,6 +155,9 @@ const AdminMessages = () => {
                       <p className="font-semibold text-sm truncate flex-1">{message.name}</p>
                       {message.status === 'unread' && (
                         <span className="w-2 h-2 bg-blue-600 rounded-full ml-2 mt-1.5"></span>
+                      )}
+                      {message.status === 'replied' && (
+                        <span className="w-2 h-2 bg-green-500 rounded-full ml-2 mt-1.5"></span>
                       )}
                     </div>
                     <p className="text-xs text-gray-500 truncate mb-1">{message.email}</p>
@@ -106,7 +177,10 @@ const AdminMessages = () => {
               <div className="p-6 border-b bg-gradient-to-r from-blue-900 via-blue-800 to-blue-900">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-white mb-2">{selectedMessage.name}</h3>
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="text-xl font-bold text-white">{selectedMessage.name}</h3>
+                      {getStatusBadge(selectedMessage.status)}
+                    </div>
                     <p className="text-blue-100 text-sm mb-1">{selectedMessage.email}</p>
                     <p className="text-blue-200 text-xs">{formatDate(selectedMessage.createdAt)}</p>
                   </div>
@@ -125,8 +199,47 @@ const AdminMessages = () => {
               {/* Message Body */}
               <div className="p-6">
                 <h4 className="text-sm font-semibold text-gray-500 mb-3">MESSAGE</h4>
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 mb-6">
                   <p className="text-gray-700 whitespace-pre-wrap">{selectedMessage.message}</p>
+                </div>
+
+                {/* Previous Reply (if exists) */}
+                {selectedMessage.reply && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-semibold text-gray-500 mb-3">YOUR REPLY</h4>
+                    <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                      <p className="text-gray-700 whitespace-pre-wrap">{selectedMessage.reply}</p>
+                      {selectedMessage.repliedAt && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          Replied on {formatDate(selectedMessage.repliedAt)} by {selectedMessage.repliedBy || 'Admin'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Reply Section */}
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-500 mb-3">
+                    {selectedMessage.reply ? 'UPDATE REPLY' : 'SEND REPLY'}
+                  </h4>
+                  <textarea
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    placeholder="Type your reply here..."
+                    rows={4}
+                    className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none mb-4"
+                  />
+                  <button
+                    onClick={handleSendReply}
+                    disabled={sending || !replyText.trim()}
+                    className="bg-gradient-to-r from-blue-900 to-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold hover:shadow-lg transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    {sending ? 'Sending...' : (selectedMessage.reply ? 'Update Reply' : 'Send Reply')}
+                  </button>
                 </div>
               </div>
             </div>

@@ -5,6 +5,7 @@ import {
   getDocs, 
   deleteDoc, 
   doc, 
+  updateDoc,
   orderBy, 
   query,
   serverTimestamp 
@@ -47,6 +48,31 @@ export const deleteMessage = async (id) => {
     return { success: true };
   } catch (error) {
     console.error('Error deleting message:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const replyToMessage = async (messageId, replyData) => {
+  try {
+    await updateDoc(doc(db, 'messages', messageId), {
+      reply: replyData.content,
+      repliedAt: serverTimestamp(),
+      repliedBy: replyData.adminEmail || 'Admin',
+      status: 'replied'
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Error replying to message:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const updateMessageStatus = async (id, status) => {
+  try {
+    await updateDoc(doc(db, 'messages', id), { status });
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating message status:', error);
     return { success: false, error: error.message };
   }
 };

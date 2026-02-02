@@ -129,24 +129,19 @@ const Contact = () => {
                 </div>
               </div>
               
-              {/* Map Placeholder */}
-              <div className="h-56 bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center relative">
-                <div className="absolute inset-0 opacity-20">
-                  <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                    <pattern id="map-grid" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-                      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#3b82f6" strokeWidth="0.5"/>
-                    </pattern>
-                    <rect width="100%" height="100%" fill="url(#map-grid)"/>
-                  </svg>
-                </div>
-                <div className="text-center z-10">
-                  <div className="w-12 h-12 bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-2 shadow-lg">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-blue-900 font-semibold">University of the Assumption</p>
-                </div>
+              {/* Google Maps Embed */}
+              <div className="h-56 relative">
+                <iframe
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3855.8562307858384!2d120.6970549!3d15.0362334!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3396f1d4b6a4a7d1%3A0x1c3b55c0b9c8e5a2!2sUniversity%20of%20the%20Assumption!5e0!3m2!1sen!2sph!4v1706860000000!5m2!1sen!2sph"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  allowFullScreen=""
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  title="University of the Assumption Location"
+                  className="rounded-none"
+                ></iframe>
               </div>
               
               <div className="p-6">
