@@ -32,11 +32,10 @@ const AdminMembers = () => {
         ...doc.data() 
       }));
 
-      // Get users from users collection (excluding admins)
+      // Get users from users collection (including admins)
       const usersSnapshot = await getDocs(collection(db, 'users'));
       const usersData = usersSnapshot.docs
         .map(doc => ({ id: doc.id, source: 'users', ...doc.data() }))
-        .filter(user => user.role !== 'admin')
         .map(user => ({
           id: user.id,
           source: 'users',
