@@ -10,6 +10,7 @@ import {
   query,
   serverTimestamp 
 } from 'firebase/firestore';
+import { createUserNotification } from './userNotificationService';
 
 const messagesCollection = collection(db, 'messages');
 
@@ -52,14 +53,28 @@ export const deleteMessage = async (id) => {
   }
 };
 
-export const replyToMessage = async (messageId, replyData) => {
+export const replyToMessage = async (messageId, replyData, originalMessage) => {
   try {
+    // Update the original message with the reply
     await updateDoc(doc(db, 'messages', messageId), {
       reply: replyData.content,
       repliedAt: serverTimestamp(),
       repliedBy: replyData.adminEmail || 'Admin',
       status: 'replied'
     });
+
+    // Create a notification for the user so they can see the reply
+    if (originalMessage && originalMessage.email) {
+      await createUserNotification({
+        userEmail: originalMessage.email,
+        userName: originalMessage.name,
+        subject: 'Reply to your message',
+        message: replyData.content,
+        originalMessage: originalMessage.message,
+        repliedBy: replyData.adminEmail || 'Admin'
+      });
+    }
+
     return { success: true };
   } catch (error) {
     console.error('Error replying to message:', error);
