@@ -59,7 +59,7 @@ const AdminMessages = () => {
       const result = await replyToMessage(selectedMessage.id, {
         content: replyText,
         adminEmail: currentUser?.email || 'Admin'
-      });
+      }, selectedMessage); // Pass the original message for notification
 
       if (result.success) {
         // Update local state
