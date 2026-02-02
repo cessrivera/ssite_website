@@ -23,10 +23,36 @@ const AdminMembers = () => {
 
   const loadMembers = async () => {
     try {
-      const q = query(collection(db, 'members'), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setMembers(data);
+      // Get members from members collection
+      const membersQuery = query(collection(db, 'members'), orderBy('createdAt', 'desc'));
+      const membersSnapshot = await getDocs(membersQuery);
+      const membersData = membersSnapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        source: 'members',
+        ...doc.data() 
+      }));
+
+      // Get users from users collection (excluding admins)
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const usersData = usersSnapshot.docs
+        .map(doc => ({ id: doc.id, source: 'users', ...doc.data() }))
+        .filter(user => user.role !== 'admin')
+        .map(user => ({
+          id: user.id,
+          source: 'users',
+          name: user.fullName || user.name || 'N/A',
+          email: user.email || 'N/A',
+          studentId: user.studentId || 'N/A',
+          course: user.course || 'N/A',
+          year: user.year || 'N/A',
+          status: user.status || 'active',
+          role: user.role || 'member',
+          createdAt: user.createdAt
+        }));
+
+      // Combine both lists
+      const combinedMembers = [...membersData, ...usersData];
+      setMembers(combinedMembers);
     } catch (error) {
       console.error('Error loading members:', error);
     } finally {
@@ -34,19 +60,21 @@ const AdminMembers = () => {
     }
   };
 
-  const handleApprove = async (id) => {
+  const handleApprove = async (id, source = 'members') => {
     try {
-      await updateDoc(doc(db, 'members', id), { status: 'active' });
+      const collectionName = source === 'users' ? 'users' : 'members';
+      await updateDoc(doc(db, collectionName, id), { status: 'active' });
       loadMembers();
     } catch (error) {
       console.error('Error approving member:', error);
     }
   };
 
-  const handleReject = async (id) => {
+  const handleReject = async (id, source = 'members') => {
     if (window.confirm('Are you sure you want to reject this member?')) {
       try {
-        await deleteDoc(doc(db, 'members', id));
+        const collectionName = source === 'users' ? 'users' : 'members';
+        await deleteDoc(doc(db, collectionName, id));
         loadMembers();
       } catch (error) {
         console.error('Error rejecting member:', error);
@@ -54,19 +82,21 @@ const AdminMembers = () => {
     }
   };
 
-  const handleUpdateRole = async (id, newRole) => {
+  const handleUpdateRole = async (id, newRole, source = 'members') => {
     try {
-      await updateDoc(doc(db, 'members', id), { role: newRole });
+      const collectionName = source === 'users' ? 'users' : 'members';
+      await updateDoc(doc(db, collectionName, id), { role: newRole });
       loadMembers();
     } catch (error) {
       console.error('Error updating role:', error);
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id, source = 'members') => {
     if (window.confirm('Are you sure you want to delete this member?')) {
       try {
-        await deleteDoc(doc(db, 'members', id));
+        const collectionName = source === 'users' ? 'users' : 'members';
+        await deleteDoc(doc(db, collectionName, id));
         loadMembers();
       } catch (error) {
         console.error('Error deleting member:', error);
@@ -97,14 +127,22 @@ const AdminMembers = () => {
     
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'members', editingMember.id), {
+      const collectionName = editingMember.source === 'users' ? 'users' : 'members';
+      const updateData = {
         name: editFormData.name,
         studentId: editFormData.studentId,
         course: editFormData.course,
         year: editFormData.year,
         status: editFormData.status,
         updatedAt: new Date().toISOString()
-      });
+      };
+      
+      // For users collection, also update fullName
+      if (editingMember.source === 'users') {
+        updateData.fullName = editFormData.name;
+      }
+      
+      await updateDoc(doc(db, collectionName, editingMember.id), updateData);
       setEditingMember(null);
       loadMembers();
     } catch (error) {
@@ -278,7 +316,7 @@ const AdminMembers = () => {
                       {member.status === 'pending' ? (
                         <>
                           <button
-                            onClick={() => handleApprove(member.id)}
+                            onClick={() => handleApprove(member.id, member.source)}
                             className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-200 transition-colors flex items-center gap-1"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -287,7 +325,7 @@ const AdminMembers = () => {
                             Approve
                           </button>
                           <button
-                            onClick={() => handleReject(member.id)}
+                            onClick={() => handleReject(member.id, member.source)}
                             className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors flex items-center gap-1"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -308,7 +346,7 @@ const AdminMembers = () => {
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDelete(member.id)}
+                            onClick={() => handleDelete(member.id, member.source)}
                             className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors flex items-center gap-1"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
