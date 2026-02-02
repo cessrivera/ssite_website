@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 const Events = () => {
   const navigate = useNavigate();
   const { currentUser, userData } = useAuth();
-  const [currentDate] = useState(new Date(2026, 0, 12)); // January 12, 2026
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -112,7 +112,28 @@ const Events = () => {
   const remainingDays = 42 - (prevDays.length + currentDays.length);
   const nextDays = Array.from({ length: remainingDays }, (_, i) => i + 1);
 
-  const eventDays = [16, 21, 22, 23, 30]; // Days with events
+  // Generate eventDays dynamically from events data
+  const eventDays = events
+    .filter(event => {
+      if (!event.date) return false;
+      const eventDate = event.date.toDate ? event.date.toDate() : new Date(event.date);
+      return eventDate.getMonth() === month && eventDate.getFullYear() === year;
+    })
+    .map(event => {
+      const eventDate = event.date.toDate ? event.date.toDate() : new Date(event.date);
+      return eventDate.getDate();
+    });
+
+  // Month navigation handlers
+  const goToPrevMonth = () => {
+    setCurrentDate(new Date(year, month - 1, 1));
+  };
+
+  const goToNextMonth = () => {
+    setCurrentDate(new Date(year, month + 1, 1));
+  };
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   return (
     <div className="py-12 bg-gray-50 min-h-screen">
@@ -128,13 +149,13 @@ const Events = () => {
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
               <div className="flex items-center justify-between mb-6">
-                <button className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                <button onClick={goToPrevMonth} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
                   <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                <h2 className="text-xl font-bold text-gray-900">January 2026</h2>
-                <button className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                <h2 className="text-xl font-bold text-gray-900">{monthNames[month]} {year}</h2>
+                <button onClick={goToNextMonth} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
                   <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
