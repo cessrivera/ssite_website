@@ -33,13 +33,12 @@ const AdminDashboard = () => {
         getMembers()
       ]);
 
-      // Also get users count (excluding admins) from users collection
+      // Also get users count from users collection (including admins)
       const usersSnapshot = await getDocs(collection(db, 'users'));
       const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const nonAdminUsers = usersList.filter(u => u.role !== 'admin');
       
-      // Total members = members collection + non-admin users
-      const totalMembers = members.length + nonAdminUsers.length;
+      // Total members = members collection + all users
+      const totalMembers = members.length + usersList.length;
       
       setStats({
         members: totalMembers,
