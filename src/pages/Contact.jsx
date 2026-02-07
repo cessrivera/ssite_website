@@ -129,8 +129,22 @@ const Contact = () => {
                 </div>
               </div>
               
+              {/* Campus Map */}
+              <div className="p-6">
+                <div className="mb-4">
+                  <img 
+                    src="/campus-map.jpg" 
+                    alt="University of the Assumption Campus Map" 
+                    className="w-full h-auto rounded-lg shadow-md border border-gray-200"
+                  />
+                </div>
+                <p className="text-gray-600 text-center text-sm mb-3">
+                  University of the Assumption Campus Map
+                </p>
+              </div>
+              
               {/* Google Maps Embed */}
-              <div className="h-56 relative">
+              <div className="h-56 relative border-t border-gray-100">
                 <iframe
                   src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3855.8562307858384!2d120.6970549!3d15.0362334!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3396f1d4b6a4a7d1%3A0x1c3b55c0b9c8e5a2!2sUniversity%20of%20the%20Assumption!5e0!3m2!1sen!2sph!4v1706860000000!5m2!1sen!2sph"
                   width="100%"
@@ -144,7 +158,7 @@ const Contact = () => {
                 ></iframe>
               </div>
               
-              <div className="p-6">
+              <div className="p-6 border-t border-gray-100">
                 <p className="text-gray-600 text-center">
                   City of San Fernando, Pampanga
                 </p>
