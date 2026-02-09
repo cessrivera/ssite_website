@@ -255,8 +255,8 @@ const AdminMembers = () => {
         </div>
       </div>
 
-      {/* Administrators Section */}
-      {adminMembers.length > 0 && (
+      {/* Administrators Section - Hidden */}
+      {/* {adminMembers.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-indigo-100/50">
             <div className="flex items-center gap-3">
@@ -292,7 +292,7 @@ const AdminMembers = () => {
             ))}
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Search */}
       <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
