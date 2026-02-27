@@ -7,6 +7,8 @@ const Announcements = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   const filters = ['All', 'Academic', 'Achievement', 'Competition', 'Event'];
 
@@ -31,6 +33,23 @@ const Announcements = () => {
     return matchesSearch && matchesFilter;
   });
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredAnnouncements.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedAnnouncements = filteredAnnouncements.slice(startIndex, startIndex + itemsPerPage);
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
+
+  const handleFilterChange = () => {
+    setCurrentPage(1);
+  };
+
   return (
     <div className="py-12 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -43,7 +62,7 @@ const Announcements = () => {
         {/* Search and Filters */}
         <div className="mb-10 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="flex-grow">
+            <div className="grow">
               <div className="relative">
                 <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -63,7 +82,10 @@ const Announcements = () => {
             {filters.map((filter) => (
               <button
                 key={filter}
-                onClick={() => setActiveFilter(filter)}
+                onClick={() => {
+                  setActiveFilter(filter);
+                  handleFilterChange();
+                }}
                 className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                   activeFilter === filter
                     ? 'bg-blue-900 text-white shadow-md'
@@ -92,121 +114,131 @@ const Announcements = () => {
               <p className="text-gray-400 text-sm mt-1">Try adjusting your search or filter</p>
             </div>
           ) : (
-            filteredAnnouncements.map((announcement) => (
-            <div key={announcement.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group">
-              {announcement.imageUrl ? (
-                <div className="h-64 overflow-hidden">
-                  <img 
-                    src={announcement.imageUrl} 
-                    alt={announcement.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.parentElement.innerHTML = '<div class="h-64 bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center"><svg class="w-20 h-20 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg></div>';
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="h-64 bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
-                  <svg className="w-20 h-20 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-                  </svg>
-                </div>
-              )}
-              
-              <div className="p-6 md:p-8">
-                <div className="flex items-center gap-3 mb-4">
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                    announcement.category === 'Academic' ? 'bg-blue-100 text-blue-700' :
-                    announcement.category === 'Achievement' ? 'bg-emerald-100 text-emerald-700' :
-                    announcement.category === 'Competition' ? 'bg-red-100 text-red-700' :
-                    'bg-purple-100 text-purple-700'
-                  }`}>
-                    {announcement.category}
-                  </span>
-                  <span className="flex items-center gap-1 text-sm text-gray-500">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    {announcement.date}
-                  </span>
-                </div>
-                
-                <h2 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-blue-900 transition-colors">{announcement.title}</h2>
-                
-                {announcement.content && (
-                  <p className="text-gray-600 mb-6 leading-relaxed line-clamp-4">{announcement.content}</p>
-                )}
-                
-                <button 
-                  onClick={() => setSelectedAnnouncement(announcement)}
-                  className="inline-flex items-center gap-2 text-blue-900 font-semibold hover:text-blue-700 transition-colors group/btn"
-                >
-                  Read Full Announcement
-                  <svg className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            ))
-          )}
-        </div>
-
-        {/* Full Announcement Modal */}
-        {selectedAnnouncement && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setSelectedAnnouncement(null)}>
-            <div 
-              className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal Header with Image */}
-              {selectedAnnouncement.imageUrl ? (
-                <div className="relative h-64 md:h-80 flex-shrink-0">
-                  <img 
-                    src={selectedAnnouncement.imageUrl} 
-                    alt={selectedAnnouncement.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
-                  <button
-                    onClick={() => setSelectedAnnouncement(null)}
-                    className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm text-white p-2 rounded-full hover:bg-white/30 transition-colors"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                  <div className="absolute bottom-4 left-6 right-6">
-                    <div className="flex items-center gap-3 mb-3">
+            <>
+              {paginatedAnnouncements.map((announcement) => (
+                <div key={announcement.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group cursor-pointer">
+                  {announcement.imageUrl ? (
+                    <div className="h-64 overflow-hidden">
+                      <img 
+                        src={announcement.imageUrl} 
+                        alt={announcement.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-64 bg-linear-to-br from-blue-500 to-blue-700 flex items-center justify-center">
+                      <svg className="w-20 h-20 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                      </svg>
+                    </div>
+                  )}
+                  
+                  <div className="p-6 md:p-8">
+                    <div className="flex items-center gap-3 mb-4">
                       <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                        selectedAnnouncement.category === 'Academic' ? 'bg-blue-100 text-blue-700' :
-                        selectedAnnouncement.category === 'Achievement' ? 'bg-emerald-100 text-emerald-700' :
-                        selectedAnnouncement.category === 'Competition' ? 'bg-red-100 text-red-700' :
+                        announcement.category === 'Academic' ? 'bg-blue-100 text-blue-700' :
+                        announcement.category === 'Achievement' ? 'bg-emerald-100 text-emerald-700' :
+                        announcement.category === 'Competition' ? 'bg-red-100 text-red-700' :
                         'bg-purple-100 text-purple-700'
                       }`}>
-                        {selectedAnnouncement.category}
+                        {announcement.category}
                       </span>
-                      <span className="flex items-center gap-1 text-sm text-white/90">
+                      <span className="flex items-center gap-1 text-sm text-gray-500">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        {selectedAnnouncement.date}
+                        {announcement.date}
                       </span>
                     </div>
-                    <h2 className="text-2xl md:text-3xl font-bold text-white">{selectedAnnouncement.title}</h2>
+                    
+                    <h2 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-blue-900 transition-colors">{announcement.title}</h2>
+                    
+                    {announcement.content && (
+                      <p className="text-gray-600 mb-6 leading-relaxed line-clamp-4">{announcement.content}</p>
+                    )}
+                    
+                    <button 
+                      onClick={() => setSelectedAnnouncement(announcement)}
+                      className="inline-flex items-center gap-2 text-blue-900 font-semibold hover:text-blue-700 transition-colors group/btn"
+                    >
+                      Read Full Announcement
+                      <svg className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
-              ) : (
-                <div className="relative bg-gradient-to-br from-blue-600 to-blue-800 p-6 flex-shrink-0">
+              ))}
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-12">
                   <button
-                    onClick={() => setSelectedAnnouncement(null)}
-                    className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm text-white p-2 rounded-full hover:bg-white/30 transition-colors"
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    Previous
                   </button>
+                  
+                  <div className="flex gap-2">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-10 h-10 rounded-lg font-medium transition-all ${
+                          currentPage === page
+                            ? 'bg-blue-900 text-white'
+                            : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <button
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Full Announcement Modal */}
+      {selectedAnnouncement && (
+        <div 
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" 
+          onClick={() => setSelectedAnnouncement(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header with Image */}
+            {selectedAnnouncement.imageUrl ? (
+              <div className="relative h-64 md:h-80 shrink-0">
+                <img 
+                  src={selectedAnnouncement.imageUrl} 
+                  alt={selectedAnnouncement.title}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent"></div>
+                <button
+                  onClick={() => setSelectedAnnouncement(null)}
+                  className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm text-white p-2 rounded-full hover:bg-white/30 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <div className="absolute bottom-4 left-6 right-6">
                   <div className="flex items-center gap-3 mb-3">
                     <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
                       selectedAnnouncement.category === 'Academic' ? 'bg-blue-100 text-blue-700' :
@@ -225,30 +257,56 @@ const Announcements = () => {
                   </div>
                   <h2 className="text-2xl md:text-3xl font-bold text-white">{selectedAnnouncement.title}</h2>
                 </div>
-              )}
-
-              {/* Modal Content */}
-              <div className="p-6 md:p-8 overflow-y-auto flex-grow">
-                {selectedAnnouncement.content && (
-                  <div className="prose prose-lg max-w-none">
-                    <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{selectedAnnouncement.content}</p>
-                  </div>
-                )}
               </div>
-
-              {/* Modal Footer */}
-              <div className="p-6 border-t border-gray-100 flex-shrink-0">
+            ) : (
+              <div className="relative bg-linear-to-br from-blue-600 to-blue-800 p-6 shrink-0">
                 <button
                   onClick={() => setSelectedAnnouncement(null)}
-                  className="w-full bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                  className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm text-white p-2 rounded-full hover:bg-white/30 transition-colors"
                 >
-                  Close
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
+                <div className="flex items-center gap-3 mb-3">
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                    selectedAnnouncement.category === 'Academic' ? 'bg-blue-100 text-blue-700' :
+                    selectedAnnouncement.category === 'Achievement' ? 'bg-emerald-100 text-emerald-700' :
+                    selectedAnnouncement.category === 'Competition' ? 'bg-red-100 text-red-700' :
+                    'bg-purple-100 text-purple-700'
+                  }`}>
+                    {selectedAnnouncement.category}
+                  </span>
+                  <span className="flex items-center gap-1 text-sm text-white/90">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    {selectedAnnouncement.date}
+                  </span>
+                </div>
+                <h2 className="text-2xl md:text-3xl font-bold text-white">{selectedAnnouncement.title}</h2>
               </div>
+            )}
+
+            {/* Modal Content */}
+            <div className="p-6 md:p-8 overflow-y-auto grow">
+              {selectedAnnouncement.content && (
+                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{selectedAnnouncement.content}</p>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-gray-100 shrink-0">
+              <button
+                onClick={() => setSelectedAnnouncement(null)}
+                className="w-full bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

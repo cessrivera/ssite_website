@@ -75,15 +75,11 @@ const Events = () => {
       const result = await registerForEvent(registrationData);
       
       if (result.success) {
-        alert('Successfully registered for the event! You will receive a confirmation email shortly.');
         setShowRegistrationModal(false);
         setIsAlreadyRegistered(true);
-      } else {
-        alert('Error registering for event. Please try again.');
       }
     } catch (error) {
       console.error('Error registering:', error);
-      alert('Error registering for event. Please try again.');
     } finally {
       setRegistering(false);
     }

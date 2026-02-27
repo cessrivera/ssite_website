@@ -74,3 +74,31 @@ export const deleteAnnouncement = async (id) => {
     throw error;
   }
 };
+
+export const archiveAnnouncement = async (id) => {
+  try {
+    const docRef = doc(db, COLLECTION, id);
+    await updateDoc(docRef, {
+      archived: true,
+      archivedAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
+  } catch (error) {
+    console.error('Error archiving announcement:', error);
+    throw error;
+  }
+};
+
+export const unarchiveAnnouncement = async (id) => {
+  try {
+    const docRef = doc(db, COLLECTION, id);
+    await updateDoc(docRef, {
+      archived: false,
+      archivedAt: null,
+      updatedAt: Timestamp.now()
+    });
+  } catch (error) {
+    console.error('Error unarchiving announcement:', error);
+    throw error;
+  }
+};

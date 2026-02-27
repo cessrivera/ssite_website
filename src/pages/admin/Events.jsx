@@ -42,7 +42,6 @@ const AdminEvents = () => {
       loadEvents();
     } catch (error) {
       console.error('Error saving event:', error);
-      alert('Error saving event. Please try again.');
     }
   };
 

@@ -27,6 +27,29 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Fetch user data to check approval status
+      const userDoc = await getDoc(doc(db, 'users', result.user.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        // If user is pending approval, sign them out and return error
+        if (userData.status === 'pending') {
+          await signOut(auth);
+          return { 
+            success: false, 
+            error: 'Your account is pending admin approval. Please wait for confirmation.' 
+          };
+        }
+        // If user is archived/inactive, prevent login
+        if (userData.status === 'inactive' || userData.status === 'archived') {
+          await signOut(auth);
+          return { 
+            success: false, 
+            error: 'Your account has been deactivated. Please contact an administrator.' 
+          };
+        }
+      }
+      
       return { success: true, user: result.user };
     } catch (error) {
       return { success: false, error: error.message };
@@ -53,7 +76,7 @@ export const AuthProvider = ({ children }) => {
         role: 'member',
         ...userData,
         createdAt: new Date().toISOString(),
-        status: 'active'
+        status: 'pending' // Set to pending so admin must approve before user can login
       });
       
       return { success: true, user: result.user };

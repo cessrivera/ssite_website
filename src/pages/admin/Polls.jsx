@@ -58,7 +58,6 @@ const AdminPolls = () => {
       loadPolls();
     } catch (error) {
       console.error('Error saving poll:', error);
-      alert('Error saving poll. Please try again.');
     }
   };
 

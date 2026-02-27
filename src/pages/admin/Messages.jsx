@@ -50,7 +50,6 @@ const AdminMessages = () => {
 
   const handleSendReply = async () => {
     if (!replyText.trim()) {
-      alert('Please enter a reply message');
       return;
     }
 
@@ -74,13 +73,7 @@ const AdminMessages = () => {
         setMessages(messages.map(msg => 
           msg.id === selectedMessage.id ? updatedMessage : msg
         ));
-        alert('Reply sent successfully!');
-      } else {
-        alert('Error sending reply. Please try again.');
       }
-    } catch (error) {
-      console.error('Error sending reply:', error);
-      alert('Error sending reply. Please try again.');
     } finally {
       setSending(false);
     }

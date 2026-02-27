@@ -20,14 +20,10 @@ const Contact = () => {
     try {
       const result = await createMessage(formData);
       if (result.success) {
-        alert('Message sent successfully! We will get back to you soon.');
         setFormData({ name: '', email: '', message: '' });
-      } else {
-        alert('Error sending message. Please try again.');
       }
     } catch (error) {
       console.error('Error submitting form:', error);
-      alert('Error sending message. Please try again.');
     } finally {
       setSending(false);
     }
