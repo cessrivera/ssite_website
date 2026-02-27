@@ -26,25 +26,21 @@ const Polls = () => {
 
   const handleVote = async (pollId, optionIndex) => {
     if (!currentUser) {
-      alert('Please log in to vote');
       return;
     }
 
     const poll = polls.find(p => p.id === pollId);
     if (poll.votedUsers?.includes(currentUser.uid)) {
-      alert('You have already voted on this poll');
       return;
     }
 
     try {
       await votePoll(pollId, optionIndex, currentUser.uid);
-      alert('Vote submitted successfully!');
       loadPolls();
       setSelectedPoll(null);
       setSelectedOption(null);
     } catch (error) {
       console.error('Error voting:', error);
-      alert('Error submitting vote. Please try again.');
     }
   };
 

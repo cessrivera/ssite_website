@@ -99,7 +99,6 @@ const AdminMembers = () => {
         loadMembers();
       } catch (error) {
         console.error('Error deleting member:', error);
-        alert('Failed to delete member. Please try again.');
       }
     }
   };
@@ -146,7 +145,6 @@ const AdminMembers = () => {
       loadMembers();
     } catch (error) {
       console.error('Error updating member:', error);
-      alert('Failed to update member. Please try again.');
     } finally {
       setSaving(false);
     }

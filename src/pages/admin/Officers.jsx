@@ -46,7 +46,6 @@ const AdminOfficers = () => {
       loadOfficers();
     } catch (error) {
       console.error('Error saving officer:', error);
-      alert('Error saving officer. Please try again.');
     }
   };
 

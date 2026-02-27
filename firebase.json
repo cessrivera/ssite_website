@@ -1,6 +1,7 @@
 {
-  "projects": {
-    "default": "ssite-81018"
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   },
   "functions": [
     {

@@ -58,10 +58,9 @@ const Membership = () => {
           year: formData.yearLevel,
           course: 'BSIT',
           email: formData.email,
-          status: 'active'
+          status: 'pending'
         });
 
-        alert('Registration successful! You are now logged in.');
         navigate('/');
       } else {
         setError(result.error || 'Registration failed. Please try again.');
