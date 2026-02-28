@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement } from '../../services/announcementService';
 import Modal from '../../components/common/Modal';
+import ImageUploader from '../../components/common/ImageUploader';
 
 const AdminAnnouncements = () => {
   const [announcements, setAnnouncements] = useState([]);
@@ -138,28 +139,12 @@ const AdminAnnouncements = () => {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Image URL</label>
-            <input
-              type="url"
-              value={formData.imageUrl}
-              onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-              placeholder="https://example.com/image.jpg"
-              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-            />
-            {formData.imageUrl && (
-              <div className="mt-3">
-                <img 
-                  src={formData.imageUrl} 
-                  alt="Preview" 
-                  className="max-w-xs max-h-48 rounded-xl border-2 border-gray-200"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
-              </div>
-            )}
-          </div>
+          <ImageUploader
+            value={formData.imageUrl}
+            onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+            folder="ssite/announcements"
+            label="Announcement Image"
+          />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>

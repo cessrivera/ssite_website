@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getEvents, createEvent, updateEvent, deleteEvent } from '../../services/eventService';
+import ImageUploader from '../../components/common/ImageUploader';
 
 const AdminEvents = () => {
   const [events, setEvents] = useState([]);
@@ -162,42 +163,12 @@ const AdminEvents = () => {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Image URL</label>
-              <input
-                type="text"
-                placeholder="Direct image URL (e.g., https://i.ibb.co/xxxxx/image.jpg)"
-                value={formData.imageUrl}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                📌 For ImgBB: Upload image → Click "Get share links" → Copy the URL from <strong>"Viewer links"</strong> (starts with https://i.ibb.co/)
-              </p>
-              {formData.imageUrl && (
-                <div className="mt-3 rounded-xl overflow-hidden border-2 border-gray-200">
-                  <img 
-                    src={formData.imageUrl} 
-                    alt="Preview" 
-                    className="w-full h-48 object-cover"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'flex';
-                    }}
-                  />
-                  <div style={{display: 'none'}} className="w-full h-48 bg-gray-100 flex items-center justify-center flex-col gap-2 p-4">
-                    <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <p className="text-gray-500 text-sm font-medium">Unable to load image</p>
-                    <p className="text-gray-400 text-xs text-center">
-                      ❌ This might be a page URL (https://ibb.co/xxxxx)<br/>
-                      ✅ Use direct image link (https://i.ibb.co/xxxxx/file.jpg)
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+            <ImageUploader
+              value={formData.imageUrl}
+              onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+              folder="ssite/events"
+              label="Event Image"
+            />
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>

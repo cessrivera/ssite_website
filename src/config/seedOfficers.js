@@ -2,6 +2,12 @@
 import { collection, addDoc, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
 
+// ⚠️ IMPORTANT: Replace the placeholder URLs below with your actual Cloudinary URLs
+// after uploading officer images to Cloudinary (folder: ssite/officers).
+// Format: https://res.cloudinary.com/YOUR_CLOUD_NAME/image/upload/v.../ssite/officers/filename.png
+//
+// The old ibb.co URLs were page links (not direct image URLs) and did not work as <img> sources.
+
 const officersData = [
   {
     // Mr. Mark Anthony D. Madalipay, MT - SSITE Adviser
