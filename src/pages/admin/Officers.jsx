@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getOfficers, createOfficer, updateOfficer, deleteOfficer } from '../../services/officerService';
+import ImageUploader from '../../components/common/ImageUploader';
 
 const AdminOfficers = () => {
   const [officers, setOfficers] = useState([]);
@@ -206,17 +207,12 @@ const AdminOfficers = () => {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Photo URL</label>
-              <input
-                type="text"
-                placeholder="https://example.com/photo.jpg"
-                value={formData.image}
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              />
-              <p className="text-xs text-gray-500 mt-2">Enter the URL of the officer's photo</p>
-            </div>
+            <ImageUploader
+              value={formData.image}
+              onChange={(url) => setFormData({ ...formData, image: url })}
+              folder="ssite/officers"
+              label="Officer Photo"
+            />
 
             <div className="flex gap-3 pt-2">
               <button
