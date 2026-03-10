@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 
 const AdminMembers = () => {
   const [members, setMembers] = useState([]);
@@ -16,6 +17,7 @@ const AdminMembers = () => {
     status: ''
   });
   const [saving, setSaving] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   useEffect(() => {
     loadMembers();
@@ -69,16 +71,23 @@ const AdminMembers = () => {
     }
   };
 
-  const handleReject = async (id, source = 'members') => {
-    if (window.confirm('Are you sure you want to reject this member?')) {
-      try {
-        const collectionName = source === 'users' ? 'users' : 'members';
-        await deleteDoc(doc(db, collectionName, id));
-        loadMembers();
-      } catch (error) {
-        console.error('Error rejecting member:', error);
+  const handleReject = (id, source = 'members') => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Reject Member',
+      message: 'Are you sure you want to reject this member? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          const collectionName = source === 'users' ? 'users' : 'members';
+          await deleteDoc(doc(db, collectionName, id));
+          loadMembers();
+        } catch (error) {
+          console.error('Error rejecting member:', error);
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
       }
-    }
+    });
   };
 
   const handleUpdateRole = async (id, newRole, source = 'members') => {
@@ -91,16 +100,23 @@ const AdminMembers = () => {
     }
   };
 
-  const handleDelete = async (id, source = 'members') => {
-    if (window.confirm('Are you sure you want to delete this member?')) {
-      try {
-        const collectionName = source === 'users' ? 'users' : 'members';
-        await deleteDoc(doc(db, collectionName, id));
-        loadMembers();
-      } catch (error) {
-        console.error('Error deleting member:', error);
+  const handleDelete = (id, source = 'members') => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Member',
+      message: 'Are you sure you want to delete this member? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          const collectionName = source === 'users' ? 'users' : 'members';
+          await deleteDoc(doc(db, collectionName, id));
+          loadMembers();
+        } catch (error) {
+          console.error('Error deleting member:', error);
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
       }
-    }
+    });
   };
 
   const handleEditClick = (member) => {
@@ -564,6 +580,15 @@ const AdminMembers = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText="Confirm"
+      />
     </div>
   );
 };

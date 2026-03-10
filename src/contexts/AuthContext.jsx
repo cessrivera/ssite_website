@@ -76,8 +76,11 @@ export const AuthProvider = ({ children }) => {
         role: 'member',
         ...userData,
         createdAt: new Date().toISOString(),
-        status: 'pending' // Set to pending so admin must approve before user can login
+        status: 'pending'
       });
+      
+      // Sign out immediately — pending users must not access the app
+      await signOut(auth);
       
       return { success: true, user: result.user };
     } catch (error) {

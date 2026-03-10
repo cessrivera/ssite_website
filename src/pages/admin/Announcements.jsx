@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { getAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement } from '../../services/announcementService';
+import { getAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement, archiveAnnouncement, unarchiveAnnouncement } from '../../services/announcementService';
 import Modal from '../../components/common/Modal';
 import ImageUploader from '../../components/common/ImageUploader';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 
 const AdminAnnouncements = () => {
   const [announcements, setAnnouncements] = useState([]);
@@ -19,6 +20,8 @@ const AdminAnnouncements = () => {
 
   const categories = ['Academic', 'Achievement', 'Competition', 'Event', 'General'];
   const statuses = ['Published', 'Draft'];
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     loadAnnouncements();
@@ -63,14 +66,48 @@ const AdminAnnouncements = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this announcement?')) {
-      try {
-        await deleteAnnouncement(id);
-        loadAnnouncements();
-      } catch (error) {
-        console.error('Error deleting announcement:', error);
+  const handleDelete = (id) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Announcement',
+      message: 'Are you sure you want to delete this announcement? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await deleteAnnouncement(id);
+          loadAnnouncements();
+        } catch (error) {
+          console.error('Error deleting announcement:', error);
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
       }
+    });
+  };
+
+  const handleArchive = (id) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Archive Announcement',
+      message: 'Are you sure you want to archive this announcement? It will be hidden from the public page.',
+      onConfirm: async () => {
+        try {
+          await archiveAnnouncement(id);
+          loadAnnouncements();
+        } catch (error) {
+          console.error('Error archiving announcement:', error);
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  const handleUnarchive = async (id) => {
+    try {
+      await unarchiveAnnouncement(id);
+      loadAnnouncements();
+    } catch (error) {
+      console.error('Error unarchiving announcement:', error);
     }
   };
 
@@ -217,19 +254,34 @@ const AdminAnnouncements = () => {
 
       {/* Announcements Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* Tab Toggle */}
+        <div className="flex border-b border-gray-200">
+          <button
+            onClick={() => setShowArchived(false)}
+            className={`flex-1 py-3 text-sm font-semibold text-center transition-colors ${!showArchived ? 'text-blue-700 border-b-2 border-blue-700 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Active ({announcements.filter(a => !a.archived).length})
+          </button>
+          <button
+            onClick={() => setShowArchived(true)}
+            className={`flex-1 py-3 text-sm font-semibold text-center transition-colors ${showArchived ? 'text-amber-700 border-b-2 border-amber-700 bg-amber-50/50' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Archived ({announcements.filter(a => a.archived).length})
+          </button>
+        </div>
         {loading ? (
           <div className="text-center py-16">
             <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
             <p className="text-gray-500">Loading announcements...</p>
           </div>
-        ) : announcements.length === 0 ? (
+        ) : announcements.filter(a => showArchived ? a.archived : !a.archived).length === 0 ? (
           <div className="text-center py-16">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
               </svg>
             </div>
-            <p className="text-gray-500">No announcements yet. Create your first one!</p>
+            <p className="text-gray-500">{showArchived ? 'No archived announcements.' : 'No announcements yet. Create your first one!'}</p>
           </div>
         ) : (
           <table className="w-full">
@@ -243,7 +295,7 @@ const AdminAnnouncements = () => {
               </tr>
             </thead>
             <tbody>
-              {announcements.map((announcement, index) => (
+              {announcements.filter(a => showArchived ? a.archived : !a.archived).map((announcement, index) => (
                 <tr key={announcement.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
                   <td className="py-4 px-6">
                     <div className="max-w-md">
@@ -265,24 +317,49 @@ const AdminAnnouncements = () => {
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEdit(announcement)}
-                        className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(announcement.id)}
-                        className="bg-red-100 text-red-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors flex items-center gap-1"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Delete
-                      </button>
+                      {showArchived ? (
+                        <>
+                          <button
+                            onClick={() => handleUnarchive(announcement.id)}
+                            className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-200 transition-colors flex items-center gap-1"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Restore
+                          </button>
+                          <button
+                            onClick={() => handleDelete(announcement.id)}
+                            className="bg-red-100 text-red-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors flex items-center gap-1"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleEdit(announcement)}
+                            className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleArchive(announcement.id)}
+                            className="bg-amber-100 text-amber-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-200 transition-colors flex items-center gap-1"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                            </svg>
+                            Archive
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -291,6 +368,15 @@ const AdminAnnouncements = () => {
           </table>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText="Delete"
+      />
     </div>
   );
 };

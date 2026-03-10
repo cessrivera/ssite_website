@@ -4,6 +4,7 @@ import { getEvents } from '../../services/eventService';
 import { getOfficers } from '../../services/officerService';
 import { getPolls } from '../../services/pollService';
 import { getMembers } from '../../services/memberService';
+import { getMessages } from '../../services/messageService';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
@@ -12,9 +13,11 @@ const Analytics = () => {
     totalAnnouncements: 0,
     publishedAnnouncements: 0,
     draftAnnouncements: 0,
+    archivedAnnouncements: 0,
     totalEvents: 0,
     upcomingEvents: 0,
     pastEvents: 0,
+    archivedEvents: 0,
     totalMembers: 0,
     activeMembers: 0,
     pendingMembers: 0,
@@ -22,7 +25,14 @@ const Analytics = () => {
     totalPolls: 0,
     activePolls: 0,
     inactivePolls: 0,
-    pollResults: []
+    totalVotes: 0,
+    pollResults: [],
+    totalMessages: 0,
+    unreadMessages: 0,
+    repliedMessages: 0,
+    totalOfficers: 0,
+    officersByTerm: [],
+    totalRegistrations: 0
   });
   const [loading, setLoading] = useState(true);
 
@@ -33,50 +43,77 @@ const Analytics = () => {
   const loadAnalytics = async () => {
     try {
       // Load all data
-      const [announcements, events, officers, polls, members] = await Promise.all([
+      const [announcements, events, officers, polls, members, messages] = await Promise.all([
         getAnnouncements(),
         getEvents(),
         getOfficers(),
         getPolls(),
-        getMembers()
+        getMembers(),
+        getMessages()
       ]);
 
       // Get users collection for admin and status info
       const usersSnapshot = await getDocs(collection(db, 'users'));
       const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      // Calculate statistics
-      const publishedAnnouncements = announcements.filter(a => a.status === 'Published').length;
-      const draftAnnouncements = announcements.filter(a => a.status === 'Draft').length;
+      // Get event registrations count
+      const registrationsSnapshot = await getDocs(collection(db, 'eventRegistrations'));
+      const totalRegistrations = registrationsSnapshot.size;
 
+      // Announcement stats
+      const publishedAnnouncements = announcements.filter(a => a.status === 'Published' && !a.archived).length;
+      const draftAnnouncements = announcements.filter(a => a.status === 'Draft' && !a.archived).length;
+      const archivedAnnouncements = announcements.filter(a => a.archived).length;
+
+      // Event stats
       const today = new Date();
-      const upcomingEvents = events.filter(e => new Date(e.date) >= today).length;
-      const pastEvents = events.filter(e => new Date(e.date) < today).length;
+      const activeEvents = events.filter(e => !e.archived);
+      const upcomingEvents = activeEvents.filter(e => new Date(e.date) >= today).length;
+      const pastEvents = activeEvents.filter(e => new Date(e.date) < today).length;
+      const archivedEvents = events.filter(e => e.archived).length;
 
+      // Member stats
       const adminUsers = users.filter(u => u.role === 'admin');
       const activeMembers = users.filter(u => u.role !== 'admin' && u.status === 'active').length;
       const pendingMembers = users.filter(u => u.role !== 'admin' && u.status === 'pending').length;
       const memberCollectionCount = members.length;
       const totalMembers = activeMembers + pendingMembers + memberCollectionCount;
 
+      // Poll stats
       const activePolls = polls.filter(p => p.active).length;
       const inactivePolls = polls.filter(p => !p.active).length;
+      const totalVotes = polls.reduce((sum, p) => sum + (p.totalVotes || 0), 0);
 
-      // Calculate poll participation stats
       const pollResults = polls.map(p => ({
         question: p.question,
         totalVotes: p.totalVotes || 0,
-        totalOptionsCount: p.options?.length || 0,
+        options: p.options || [],
         active: p.active
       })).sort((a, b) => b.totalVotes - a.totalVotes).slice(0, 5);
+
+      // Message stats
+      const unreadMessages = messages.filter(m => m.status === 'unread').length;
+      const repliedMessages = messages.filter(m => m.status === 'replied').length;
+
+      // Officers stats by term
+      const termMap = {};
+      officers.forEach(o => {
+        const term = o.term || 'Unknown';
+        termMap[term] = (termMap[term] || 0) + 1;
+      });
+      const officersByTerm = Object.entries(termMap)
+        .map(([term, count]) => ({ term, count }))
+        .sort((a, b) => b.term.localeCompare(a.term));
 
       setStats({
         totalAnnouncements: announcements.length,
         publishedAnnouncements,
         draftAnnouncements,
+        archivedAnnouncements,
         totalEvents: events.length,
         upcomingEvents,
         pastEvents,
+        archivedEvents,
         totalMembers,
         activeMembers,
         pendingMembers,
@@ -84,7 +121,14 @@ const Analytics = () => {
         totalPolls: polls.length,
         activePolls,
         inactivePolls,
-        pollResults
+        totalVotes,
+        pollResults,
+        totalMessages: messages.length,
+        unreadMessages,
+        repliedMessages,
+        totalOfficers: officers.length,
+        officersByTerm,
+        totalRegistrations
       });
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -117,7 +161,7 @@ const Analytics = () => {
         {/* Announcements */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-600">Total Announcements</h3>
+            <h3 className="text-sm font-semibold text-gray-600">Announcements</h3>
             <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
               <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
@@ -126,15 +170,16 @@ const Analytics = () => {
           </div>
           <p className="text-3xl font-bold text-gray-900">{stats.totalAnnouncements}</p>
           <p className="text-xs text-gray-500 mt-2">
-            <span className="text-green-600 font-semibold">{stats.publishedAnnouncements}</span> Published, 
-            <span className="text-amber-600 font-semibold ml-1">{stats.draftAnnouncements}</span> Draft
+            <span className="text-green-600 font-semibold">{stats.publishedAnnouncements}</span> Published,
+            <span className="text-amber-600 font-semibold ml-1">{stats.draftAnnouncements}</span> Draft,
+            <span className="text-gray-400 font-semibold ml-1">{stats.archivedAnnouncements}</span> Archived
           </p>
         </div>
 
         {/* Events */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-600">Total Events</h3>
+            <h3 className="text-sm font-semibold text-gray-600">Events</h3>
             <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
               <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -144,14 +189,15 @@ const Analytics = () => {
           <p className="text-3xl font-bold text-gray-900">{stats.totalEvents}</p>
           <p className="text-xs text-gray-500 mt-2">
             <span className="text-blue-600 font-semibold">{stats.upcomingEvents}</span> Upcoming,
-            <span className="text-gray-600 font-semibold ml-1">{stats.pastEvents}</span> Past
+            <span className="text-gray-600 font-semibold ml-1">{stats.pastEvents}</span> Past,
+            <span className="text-gray-400 font-semibold ml-1">{stats.archivedEvents}</span> Archived
           </p>
         </div>
 
         {/* Members */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-600">Total Members</h3>
+            <h3 className="text-sm font-semibold text-gray-600">Members</h3>
             <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
               <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -163,6 +209,63 @@ const Analytics = () => {
             <span className="text-green-600 font-semibold">{stats.activeMembers}</span> Active,
             <span className="text-yellow-600 font-semibold ml-1">{stats.pendingMembers}</span> Pending
           </p>
+        </div>
+
+        {/* Messages */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-gray-600">Messages</h3>
+            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+              <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+          </div>
+          <p className="text-3xl font-bold text-gray-900">{stats.totalMessages}</p>
+          <p className="text-xs text-gray-500 mt-2">
+            <span className="text-blue-600 font-semibold">{stats.unreadMessages}</span> Unread,
+            <span className="text-green-600 font-semibold ml-1">{stats.repliedMessages}</span> Replied
+          </p>
+        </div>
+      </div>
+
+      {/* Second Row: Officers, Registrations, Admins */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Officers */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-gray-600">Officers</h3>
+            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+              <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+          <p className="text-3xl font-bold text-gray-900">{stats.totalOfficers}</p>
+          {stats.officersByTerm.length > 0 && (
+            <div className="mt-3 space-y-1">
+              {stats.officersByTerm.slice(0, 3).map(({ term, count }) => (
+                <div key={term} className="flex justify-between text-xs">
+                  <span className="text-gray-500">{term}</span>
+                  <span className="font-semibold text-gray-700">{count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Event Registrations */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-gray-600">Event Registrations</h3>
+            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+              <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+            </div>
+          </div>
+          <p className="text-3xl font-bold text-gray-900">{stats.totalRegistrations}</p>
+          <p className="text-xs text-gray-500 mt-2">Total event sign-ups</p>
         </div>
 
         {/* Admins */}
@@ -194,17 +297,19 @@ const Analytics = () => {
           </div>
           
           <div className="space-y-4">
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-semibold text-gray-700">Total Polls</span>
-                <span className="text-2xl font-bold text-gray-900">{stats.totalPolls}</span>
-              </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-semibold text-gray-700">Total Polls</span>
+              <span className="text-2xl font-bold text-gray-900">{stats.totalPolls}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-semibold text-gray-700">Total Votes Cast</span>
+              <span className="text-2xl font-bold text-blue-600">{stats.totalVotes}</span>
             </div>
             
-            <div>
+            <div className="pt-2 border-t border-gray-100">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-semibold text-gray-700">Active</span>
-                <span className="text-lg font-bold text-green-600">{stats.activePolls}</span>
+                <span className="text-sm text-gray-600">Active</span>
+                <span className="text-sm font-bold text-green-600">{stats.activePolls}</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-1.5">
                 <div 
@@ -216,8 +321,8 @@ const Analytics = () => {
             
             <div>
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-semibold text-gray-700">Inactive</span>
-                <span className="text-lg font-bold text-gray-600">{stats.inactivePolls}</span>
+                <span className="text-sm text-gray-600">Closed</span>
+                <span className="text-sm font-bold text-gray-600">{stats.inactivePolls}</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-1.5">
                 <div 
@@ -229,7 +334,7 @@ const Analytics = () => {
           </div>
         </div>
 
-        {/* Top Polls */}
+        {/* Top Polls with Results */}
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           <h3 className="text-lg font-bold text-gray-900 mb-6">Top Polls by Participation</h3>
           
@@ -238,26 +343,41 @@ const Analytics = () => {
               <p className="text-gray-500">No polls created yet</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {stats.pollResults.map((poll, index) => (
-                <div key={index} className="border border-gray-200 rounded-xl p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900 line-clamp-2">{poll.question}</h4>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {poll.totalVotes} votes • {poll.totalOptionsCount} options
-                        {poll.active && <span className="ml-2 text-green-600 font-semibold">Active</span>}
-                      </p>
+            <div className="space-y-5">
+              {stats.pollResults.map((poll, index) => {
+                const maxVotes = Math.max(...poll.options.map(o => o.votes || 0), 1);
+                return (
+                  <div key={index} className="border border-gray-200 rounded-xl p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900 line-clamp-1">{poll.question}</h4>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {poll.totalVotes} total votes
+                          {poll.active && <span className="ml-2 text-green-600 font-semibold">Active</span>}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-gray-900">{poll.totalVotes}</p>
+                    <div className="space-y-2">
+                      {poll.options.slice(0, 4).map((option, idx) => {
+                        const votes = option.votes || 0;
+                        const pct = poll.totalVotes > 0 ? Math.round((votes / poll.totalVotes) * 100) : 0;
+                        return (
+                          <div key={idx} className="flex items-center gap-3">
+                            <span className="text-xs text-gray-600 w-24 truncate">{option.text}</span>
+                            <div className="flex-1 bg-gray-100 rounded-full h-3">
+                              <div
+                                className="bg-gradient-to-r from-blue-500 to-blue-700 h-3 rounded-full transition-all"
+                                style={{ width: `${maxVotes > 0 ? (votes / maxVotes) * 100 : 0}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-semibold text-gray-700 w-12 text-right">{pct}%</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: '100%' }} />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

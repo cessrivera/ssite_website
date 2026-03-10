@@ -4,16 +4,31 @@ import { getOfficers } from '../services/officerService';
 const Officers = () => {
   const [officers, setOfficers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState('2025-2026');
+  const [selectedYear, setSelectedYear] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Generate dynamic year options from officers data + a reasonable range
+  const currentYear = new Date().getFullYear();
+  const yearOptions = [];
+  for (let y = currentYear + 1; y >= 2020; y--) {
+    yearOptions.push(`${y}-${y + 1}`);
+  }
 
   useEffect(() => {
     loadOfficers();
   }, []);
 
+  useEffect(() => {
+    // Set the default selected year to the most recent term found in officers
+    if (officers.length > 0 && !selectedYear) {
+      const terms = [...new Set(officers.map(o => o.term).filter(Boolean))].sort().reverse();
+      setSelectedYear(terms[0] || yearOptions[0]);
+    }
+  }, [officers]);
+
   const loadOfficers = async () => {
     try {
       const data = await getOfficers();
-      // Sort by order field
       data.sort((a, b) => (a.order || 999) - (b.order || 999));
       setOfficers(data);
     } catch (error) {
@@ -23,7 +38,13 @@ const Officers = () => {
     }
   };
 
-  const filteredOfficers = officers.filter((officer) => officer.term === selectedYear);
+  const filteredOfficers = officers.filter((officer) => {
+    const matchesTerm = officer.term === selectedYear;
+    const matchesSearch = searchTerm === '' || 
+      officer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      officer.position?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesTerm && matchesSearch;
+  });
 
   return (
     <div className="py-12 bg-gray-50 min-h-screen">
@@ -34,24 +55,37 @@ const Officers = () => {
           <p className="text-gray-600 max-w-2xl mx-auto">Meet the dedicated team behind SSITE who work tirelessly to serve our community</p>
         </div>
 
-        {/* Filter by School Year */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-10 max-w-md mx-auto">
-          <label className="block text-sm font-semibold text-gray-700 mb-3 text-center">
-            Select Academic Year
-          </label>
-          <div className="relative">
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="w-full border-2 border-gray-200 rounded-xl px-5 py-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white font-medium text-gray-700 cursor-pointer"
-            >
-              <option value="2025-2026">2025 - 2026</option>
-              <option value="2024-2025">2024 - 2025</option>
-              <option value="2023-2024">2023 - 2024</option>
-            </select>
-            <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+        {/* Search & Filter */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-10 max-w-2xl mx-auto">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Search Bar */}
+            <div className="flex-1 relative">
+              <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search by name or position..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full border-2 border-gray-200 rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              />
+            </div>
+            {/* Year Dropdown */}
+            <div className="relative min-w-[180px]">
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="w-full border-2 border-gray-200 rounded-xl px-5 py-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white font-medium text-gray-700 cursor-pointer"
+              >
+                {yearOptions.map(yr => (
+                  <option key={yr} value={yr}>{yr}</option>
+                ))}
+              </select>
+              <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
           </div>
         </div>
 

@@ -90,3 +90,31 @@ export const deleteMember = async (id) => {
     throw error;
   }
 };
+
+export const archiveMember = async (id) => {
+  try {
+    const docRef = doc(db, COLLECTION, id);
+    await updateDoc(docRef, {
+      archived: true,
+      archivedAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
+  } catch (error) {
+    console.error('Error archiving member:', error);
+    throw error;
+  }
+};
+
+export const unarchiveMember = async (id) => {
+  try {
+    const docRef = doc(db, COLLECTION, id);
+    await updateDoc(docRef, {
+      archived: false,
+      archivedAt: null,
+      updatedAt: Timestamp.now()
+    });
+  } catch (error) {
+    console.error('Error unarchiving member:', error);
+    throw error;
+  }
+};

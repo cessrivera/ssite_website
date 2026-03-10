@@ -30,10 +30,10 @@ const Contact = () => {
   };
 
   return (
-    <div className="py-12 bg-gray-50 min-h-screen">
+    <div className="py-8 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center mb-10">
+        <div className="text-center mb-6">
           <h1 className="text-4xl font-bold text-gray-900 mb-3">Contact Us</h1>
           <p className="text-gray-600 max-w-2xl mx-auto">Have questions or suggestions? We'd love to hear from you!</p>
         </div>
@@ -90,7 +90,7 @@ const Contact = () => {
                   value={formData.message}
                   onChange={handleChange}
                   placeholder="How can we help you?"
-                  rows={5}
+                  rows={4}
                   required
                   className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
                 />
@@ -113,7 +113,7 @@ const Contact = () => {
           <div className="space-y-6">
             {/* Campus Location */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-6 border-b border-gray-100">
+              <div className="p-4 border-b border-gray-100">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
                     <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -126,7 +126,7 @@ const Contact = () => {
               </div>
               
               {/* Campus Map */}
-              <div className="p-6">
+              <div className="px-4 py-3">
                 <div className="mb-4">
                   <img 
                     src="/campus-map.jpg" 
@@ -140,7 +140,7 @@ const Contact = () => {
               </div>
               
               {/* Google Maps Embed */}
-              <div className="h-56 relative border-t border-gray-100">
+              <div className="h-40 relative border-t border-gray-100">
                 <iframe
                   src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3855.8562307858384!2d120.6970549!3d15.0362334!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3396f1d4b6a4a7d1%3A0x1c3b55c0b9c8e5a2!2sUniversity%20of%20the%20Assumption!5e0!3m2!1sen!2sph!4v1706860000000!5m2!1sen!2sph"
                   width="100%"
@@ -154,7 +154,7 @@ const Contact = () => {
                 ></iframe>
               </div>
               
-              <div className="p-6 border-t border-gray-100">
+              <div className="p-4 border-t border-gray-100">
                 <p className="text-gray-600 text-center">
                   City of San Fernando, Pampanga
                 </p>

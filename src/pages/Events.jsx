@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getEvents } from '../services/eventService';
 import { registerForEvent, isUserRegistered } from '../services/eventRegistrationService';
 import { useAuth } from '../contexts/AuthContext';
+import Modal from '../components/common/Modal';
 
 const Events = () => {
   const navigate = useNavigate();
@@ -14,6 +15,9 @@ const Events = () => {
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [selectedDateEvents, setSelectedDateEvents] = useState([]);
+  const [selectedDateStr, setSelectedDateStr] = useState('');
 
   useEffect(() => {
     loadEvents();
@@ -35,9 +39,10 @@ const Events = () => {
   const loadEvents = async () => {
     try {
       const data = await getEvents();
-      setEvents(data);
-      if (data.length > 0) {
-        setSelectedEvent(data[0]);
+      const activeEvents = data.filter(e => !e.archived);
+      setEvents(activeEvents);
+      if (activeEvents.length > 0) {
+        setSelectedEvent(activeEvents[0]);
       }
     } catch (error) {
       console.error('Error loading events:', error);
@@ -131,6 +136,18 @@ const Events = () => {
 
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
+  const handleDayClick = (day) => {
+    const clickedDate = new Date(year, month, day);
+    const dayEvents = events.filter(event => {
+      if (!event.date) return false;
+      const eventDate = event.date.toDate ? event.date.toDate() : new Date(event.date);
+      return eventDate.getDate() === day && eventDate.getMonth() === month && eventDate.getFullYear() === year;
+    });
+    setSelectedDateEvents(dayEvents);
+    setSelectedDateStr(clickedDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
+    setShowDateModal(true);
+  };
+
   return (
     <div className="py-12 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -177,6 +194,7 @@ const Events = () => {
                 {currentDays.map((day) => (
                   <div
                     key={day}
+                    onClick={() => handleDayClick(day)}
                     className={`text-center py-3 rounded-xl cursor-pointer transition-all duration-200 ${
                       day === today && !eventDays.includes(day) ? 'bg-gray-200 text-gray-900 font-bold' :
                       eventDays.includes(day) ? 'bg-blue-100 text-blue-900 font-semibold hover:bg-blue-200' :
@@ -360,6 +378,61 @@ const Events = () => {
           </div>
         )}
       </div>
+
+      {/* Date Events Modal */}
+      <Modal isOpen={showDateModal} onClose={() => setShowDateModal(false)} title={selectedDateStr} size="lg">
+        {selectedDateEvents.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg className="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <p className="text-gray-500 font-medium">No events on this date</p>
+            <p className="text-gray-400 text-sm mt-1">Check other dates for upcoming events</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {selectedDateEvents.map((event) => (
+              <div key={event.id} className="border-2 border-gray-100 rounded-xl overflow-hidden hover:border-blue-200 transition-colors">
+                {event.imageUrl && (
+                  <img src={event.imageUrl} alt={event.title} className="w-full h-40 object-cover" />
+                )}
+                <div className="p-4">
+                  <h3 className="font-bold text-gray-900 text-lg mb-2">{event.title}</h3>
+                  <div className="flex flex-wrap gap-3 mb-3 text-sm">
+                    {event.time && (
+                      <span className="flex items-center gap-1 text-gray-500 bg-gray-50 px-2 py-1 rounded-lg">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        {event.time}
+                      </span>
+                    )}
+                    {event.venue && (
+                      <span className="flex items-center gap-1 text-gray-500 bg-gray-50 px-2 py-1 rounded-lg">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        {event.venue}
+                      </span>
+                    )}
+                  </div>
+                  {event.description && (
+                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">{event.description}</p>
+                  )}
+                  <button
+                    onClick={() => {
+                      setSelectedEvent(event);
+                      setShowDateModal(false);
+                    }}
+                    className="text-blue-600 font-semibold text-sm hover:text-blue-800 transition-colors flex items-center gap-1"
+                  >
+                    View Details & Register
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
 
       {/* Registration Modal */}
       {showRegistrationModal && (

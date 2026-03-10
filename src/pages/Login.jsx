@@ -5,14 +5,14 @@ import { createAdminUser } from '../config/setupAdmin';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
-const Login = () => {
+const Login = ({ defaultAdminLogin = false }) => {
   const navigate = useNavigate();
   const { login, currentUser, isAdmin } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
-  const [isAdminLogin, setIsAdminLogin] = useState(false);
+  const [isAdminLogin, setIsAdminLogin] = useState(defaultAdminLogin);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -155,7 +155,7 @@ const Login = () => {
 
               <button
                 type="button"
-                onClick={() => setIsAdminLogin(false)}
+                onClick={() => navigate('/login')}
                 className="w-full border-2 border-gray-200 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

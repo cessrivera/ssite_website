@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getPolls, createPoll, updatePoll, deletePoll } from '../../services/pollService';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 
 const AdminPolls = () => {
   const [polls, setPolls] = useState([]);
@@ -14,6 +15,7 @@ const AdminPolls = () => {
     endDate: '',
     active: true
   });
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   useEffect(() => {
     loadPolls();
@@ -73,15 +75,22 @@ const AdminPolls = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this poll?')) {
-      try {
-        await deletePoll(id);
-        loadPolls();
-      } catch (error) {
-        console.error('Error deleting poll:', error);
+  const handleDelete = (id) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Poll',
+      message: 'Are you sure you want to delete this poll? All votes will be lost. This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await deletePoll(id);
+          loadPolls();
+        } catch (error) {
+          console.error('Error deleting poll:', error);
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
       }
-    }
+    });
   };
 
   const handleToggleActive = async (poll) => {
@@ -456,6 +465,15 @@ const AdminPolls = () => {
         </div>
       )}
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText="Delete"
+      />
     </div>
   );
 };

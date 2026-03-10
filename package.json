@@ -7,11 +7,14 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "migrate:cloudinary:assets": "node scripts/migrate-cloudinary-assets.mjs",
+    "migrate:cloudinary:firestore": "node scripts/rewrite-firestore-cloudinary-urls.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
     "firebase": "^12.7.0",
+    "firebase-admin": "^13.5.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.12.0",

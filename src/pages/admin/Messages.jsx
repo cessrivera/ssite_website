@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getMessages, deleteMessage, replyToMessage, updateMessageStatus } from '../../services/messageService';
 import { useAuth } from '../../contexts/AuthContext';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 
 const AdminMessages = () => {
   const { currentUser } = useAuth();
@@ -9,6 +10,7 @@ const AdminMessages = () => {
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   useEffect(() => {
     fetchMessages();
@@ -25,14 +27,20 @@ const AdminMessages = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this message?')) {
-      const result = await deleteMessage(id);
-      if (result.success) {
-        setMessages(messages.filter(msg => msg.id !== id));
-        setSelectedMessage(null);
+  const handleDelete = (id) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Message',
+      message: 'Are you sure you want to delete this message? This action cannot be undone.',
+      onConfirm: async () => {
+        const result = await deleteMessage(id);
+        if (result.success) {
+          setMessages(messages.filter(msg => msg.id !== id));
+          setSelectedMessage(null);
+        }
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
-    }
+    });
   };
 
   const handleSelectMessage = async (message) => {
@@ -250,6 +258,15 @@ const AdminMessages = () => {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText="Delete"
+      />
     </div>
   );
 };

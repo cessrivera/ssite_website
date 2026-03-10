@@ -19,7 +19,7 @@ const Announcements = () => {
   const loadAnnouncements = async () => {
     try {
       const data = await getAnnouncements();
-      setAnnouncements(data.filter(a => a.status === 'Published'));
+      setAnnouncements(data.filter(a => a.status === 'Published' && !a.archived));
     } catch (error) {
       console.error('Error loading announcements:', error);
     } finally {

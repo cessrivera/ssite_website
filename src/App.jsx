@@ -36,6 +36,7 @@ function App() {
           <Route path="/contact" element={<Layout><Contact /></Layout>} />
           <Route path="/membership" element={<Layout><Membership /></Layout>} />
           <Route path="/login" element={<Layout><Login /></Layout>} />
+          <Route path="/admin-login" element={<Layout><Login defaultAdminLogin={true} /></Layout>} />
           <Route path="/forgot-password" element={<Layout><ForgotPassword /></Layout>} />
 
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>

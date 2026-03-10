@@ -116,17 +116,22 @@ const Polls = () => {
                               onClick={() => setSelectedOption(idx)}
                               className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all duration-200 ${
                               selectedOption === idx 
-                                ? 'bg-blue-50 border-2 border-blue-500' 
+                                ? 'bg-blue-50 border-2 border-blue-500 shadow-sm' 
                                 : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
                             }`}>
-                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                                 selectedOption === idx ? 'border-blue-500' : 'border-gray-300'
                               }`}>
                                 {selectedOption === idx && (
                                   <div className="w-2.5 h-2.5 bg-blue-500 rounded-full"></div>
                                 )}
                               </div>
-                              <span className="font-medium text-gray-700">{option.text}</span>
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center flex-shrink-0">
+                                  <span className="text-blue-700 font-bold text-sm">{String.fromCharCode(65 + idx)}</span>
+                                </div>
+                                <span className="font-medium text-gray-700">{option.text}</span>
+                              </div>
                             </label>
                           </div>
                         ))}
@@ -162,8 +167,13 @@ const Polls = () => {
                             
                             return (
                               <div key={idx}>
-                                <div className="flex justify-between mb-2">
-                                  <span className="font-medium text-gray-700">{option.text}</span>
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center flex-shrink-0">
+                                      <span className="text-blue-700 font-bold text-xs">{String.fromCharCode(65 + idx)}</span>
+                                    </div>
+                                    <span className="font-medium text-gray-700">{option.text}</span>
+                                  </div>
                                   <span className="text-blue-900 font-bold">{percentage}%</span>
                                 </div>
                                 <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">

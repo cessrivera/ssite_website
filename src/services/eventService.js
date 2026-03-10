@@ -59,3 +59,31 @@ export const deleteEvent = async (id) => {
     throw error;
   }
 };
+
+export const archiveEvent = async (id) => {
+  try {
+    const docRef = doc(db, COLLECTION, id);
+    await updateDoc(docRef, {
+      archived: true,
+      archivedAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
+  } catch (error) {
+    console.error('Error archiving event:', error);
+    throw error;
+  }
+};
+
+export const unarchiveEvent = async (id) => {
+  try {
+    const docRef = doc(db, COLLECTION, id);
+    await updateDoc(docRef, {
+      archived: false,
+      archivedAt: null,
+      updatedAt: Timestamp.now()
+    });
+  } catch (error) {
+    console.error('Error unarchiving event:', error);
+    throw error;
+  }
+};

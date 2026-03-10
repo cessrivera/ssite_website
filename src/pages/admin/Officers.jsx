@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getOfficers, createOfficer, updateOfficer, deleteOfficer } from '../../services/officerService';
 import ImageUploader from '../../components/common/ImageUploader';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 
 const AdminOfficers = () => {
   const [officers, setOfficers] = useState([]);
@@ -16,9 +17,17 @@ const AdminOfficers = () => {
     image: '',
     order: 0
   });
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   const courses = ['BSIT', 'BSIS', 'BSCS', 'WMAD'];
   const years = ['1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B'];
+
+  // Generate dynamic term options
+  const currentYear = new Date().getFullYear();
+  const termOptions = [];
+  for (let y = currentYear + 1; y >= 2020; y--) {
+    termOptions.push(`${y}-${y + 1}`);
+  }
 
   useEffect(() => {
     loadOfficers();
@@ -64,15 +73,22 @@ const AdminOfficers = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this officer?')) {
-      try {
-        await deleteOfficer(id);
-        loadOfficers();
-      } catch (error) {
-        console.error('Error deleting officer:', error);
+  const handleDelete = (id) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Officer',
+      message: 'Are you sure you want to delete this officer? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await deleteOfficer(id);
+          loadOfficers();
+        } catch (error) {
+          console.error('Error deleting officer:', error);
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
       }
-    }
+    });
   };
 
   const resetForm = () => {
@@ -186,14 +202,21 @@ const AdminOfficers = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Term</label>
-                <input
-                  type="text"
-                  placeholder="e.g., 2025-2026"
-                  value={formData.term}
-                  onChange={(e) => setFormData({ ...formData, term: e.target.value })}
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                />
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Term / Academic Year</label>
+                <div className="relative">
+                  <select
+                    value={formData.term}
+                    onChange={(e) => setFormData({ ...formData, term: e.target.value })}
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white cursor-pointer transition-all"
+                  >
+                    {termOptions.map(term => (
+                      <option key={term} value={term}>{term}</option>
+                    ))}
+                  </select>
+                  <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
 
               <div>
@@ -297,6 +320,15 @@ const AdminOfficers = () => {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText="Delete"
+      />
     </div>
   );
 };
