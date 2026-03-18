@@ -3,6 +3,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/layout/Layout';
 import { AdminRoute } from './components/auth/ProtectedRoute';
 import AdminLayout from './components/admin/AdminLayout';
+import MaintenanceGate from './components/common/MaintenanceGate';
 
 import Home from './pages/Home';
 import Announcements from './pages/Announcements';
@@ -22,23 +23,26 @@ import AdminPolls from './pages/admin/Polls';
 import AdminMembers from './pages/admin/Members';
 import AdminMessages from './pages/admin/Messages';
 import AdminSettings from './pages/admin/Settings';
+import AdminAnalytics from './pages/admin/Analytics';
 
 function App() {
   return (
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<Layout><Home /></Layout>} />
-          <Route path="/announcements" element={<Layout><Announcements /></Layout>} />
-          <Route path="/events" element={<Layout><Events /></Layout>} />
-          <Route path="/officers" element={<Layout><Officers /></Layout>} />
-          <Route path="/polls" element={<Layout><Polls /></Layout>} />
-          <Route path="/contact" element={<Layout><Contact /></Layout>} />
-          <Route path="/membership" element={<Layout><Membership /></Layout>} />
+          {/* Public Routes - wrapped in MaintenanceGate */}
+          <Route path="/" element={<MaintenanceGate><Layout><Home /></Layout></MaintenanceGate>} />
+          <Route path="/announcements" element={<MaintenanceGate><Layout><Announcements /></Layout></MaintenanceGate>} />
+          <Route path="/events" element={<MaintenanceGate><Layout><Events /></Layout></MaintenanceGate>} />
+          <Route path="/officers" element={<MaintenanceGate><Layout><Officers /></Layout></MaintenanceGate>} />
+          <Route path="/polls" element={<MaintenanceGate><Layout><Polls /></Layout></MaintenanceGate>} />
+          <Route path="/contact" element={<MaintenanceGate><Layout><Contact /></Layout></MaintenanceGate>} />
+          <Route path="/membership" element={<MaintenanceGate><Layout><Membership /></Layout></MaintenanceGate>} />
           <Route path="/login" element={<Layout><Login /></Layout>} />
           <Route path="/admin-login" element={<Layout><Login defaultAdminLogin={true} /></Layout>} />
           <Route path="/forgot-password" element={<Layout><ForgotPassword /></Layout>} />
 
+          {/* Admin Routes - never blocked by maintenance */}
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
             <Route index element={<AdminDashboard />} />
             <Route path="announcements" element={<AdminAnnouncements />} />
@@ -48,6 +52,7 @@ function App() {
             <Route path="members" element={<AdminMembers />} />
             <Route path="messages" element={<AdminMessages />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="analytics" element={<AdminAnalytics />} />
           </Route>
         </Routes>
       </Router>

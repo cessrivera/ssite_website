@@ -28,10 +28,10 @@ const AdminMembers = () => {
       // Get members from members collection
       const membersQuery = query(collection(db, 'members'), orderBy('createdAt', 'desc'));
       const membersSnapshot = await getDocs(membersQuery);
-      const membersData = membersSnapshot.docs.map(doc => ({ 
-        id: doc.id, 
+      const membersData = membersSnapshot.docs.map(doc => ({
+        id: doc.id,
         source: 'members',
-        ...doc.data() 
+        ...doc.data()
       }));
 
       // Get users from users collection (including admins)
@@ -90,16 +90,6 @@ const AdminMembers = () => {
     });
   };
 
-  const handleUpdateRole = async (id, newRole, source = 'members') => {
-    try {
-      const collectionName = source === 'users' ? 'users' : 'members';
-      await updateDoc(doc(db, collectionName, id), { role: newRole });
-      loadMembers();
-    } catch (error) {
-      console.error('Error updating role:', error);
-    }
-  };
-
   const handleDelete = (id, source = 'members') => {
     setConfirmDialog({
       isOpen: true,
@@ -138,7 +128,7 @@ const AdminMembers = () => {
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     if (!editingMember) return;
-    
+
     setSaving(true);
     try {
       const collectionName = editingMember.source === 'users' ? 'users' : 'members';
@@ -150,12 +140,12 @@ const AdminMembers = () => {
         status: editFormData.status,
         updatedAt: new Date().toISOString()
       };
-      
+
       // For users collection, also update fullName
       if (editingMember.source === 'users') {
         updateData.fullName = editFormData.name;
       }
-      
+
       await updateDoc(doc(db, collectionName, editingMember.id), updateData);
       setEditingMember(null);
       loadMembers();
@@ -178,20 +168,30 @@ const AdminMembers = () => {
     });
   };
 
-  const filteredMembers = members
-    .filter(member => (member.role || 'member') !== 'admin')
+  // Filter out admins from the main list
+  const nonAdminMembers = members.filter(member => (member.role || 'member') !== 'admin');
+
+  // Separate pending and active members
+  const pendingMembersList = nonAdminMembers
+    .filter(member => member.status === 'pending')
     .filter(member =>
       member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.studentId?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-  // Get admins separately
-  const adminMembers = members.filter(member => member.role === 'admin');
+  const activeMembersList = nonAdminMembers
+    .filter(member => member.status !== 'pending')
+    .filter(member =>
+      member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.studentId?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
-  const totalMembers = members.filter(m => (m.role || 'member') !== 'admin').length;
-  const pendingMembers = members.filter(m => m.status === 'pending' && (m.role || 'member') !== 'admin').length;
-  const activeMembers = members.filter(m => m.status === 'active' && (m.role || 'member') !== 'admin').length;
+  const totalMembers = nonAdminMembers.length;
+  const pendingMembers = nonAdminMembers.filter(m => m.status === 'pending').length;
+  const activeMembers = nonAdminMembers.filter(m => m.status === 'active').length;
+  const adminMembers = members.filter(member => member.role === 'admin');
   const totalAdmins = adminMembers.length;
 
   const getStatusBadge = (status) => {
@@ -269,49 +269,10 @@ const AdminMembers = () => {
         </div>
       </div>
 
-      {/* Administrators Section - Hidden */}
-      {/* {adminMembers.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-indigo-100/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-                <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-bold text-gray-900">Administrators</h2>
-            </div>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {adminMembers.map((admin) => (
-              <div key={admin.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold text-lg shadow-lg">
-                    {(admin.name || admin.fullName || 'A').charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-900">{admin.name || admin.fullName || 'N/A'}</p>
-                    <p className="text-sm text-gray-500">{admin.email || 'N/A'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium">
-                    Admin
-                  </span>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(admin.status)}`}>
-                    {admin.status || 'active'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )} */}
-
       {/* Search */}
       <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-900">All Members</h2>
+          <h2 className="text-xl font-bold text-gray-900">Member Management</h2>
           <div className="relative">
             <svg className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -327,15 +288,119 @@ const AdminMembers = () => {
         </div>
       </div>
 
-      {/* Members Table */}
+      {/* Pending Approval Section */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-amber-50 to-amber-100/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+              <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Pending Approval</h2>
+              <p className="text-sm text-gray-500">{pendingMembersList.length} member{pendingMembersList.length !== 1 ? 's' : ''} waiting for approval</p>
+            </div>
+          </div>
+        </div>
+
         {loading ? (
-          <div className="text-center py-16">
+          <div className="text-center py-12">
+            <div className="w-10 h-10 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+            <p className="text-gray-500">Loading...</p>
+          </div>
+        ) : pendingMembersList.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <p className="text-gray-500">No pending approvals</p>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead className="bg-gradient-to-r from-amber-500 to-amber-600">
+              <tr>
+                <th className="text-left py-4 px-6 font-semibold text-white">Student #</th>
+                <th className="text-left py-4 px-6 font-semibold text-white">Name</th>
+                <th className="text-left py-4 px-6 font-semibold text-white">Course</th>
+                <th className="text-left py-4 px-6 font-semibold text-white">Year</th>
+                <th className="text-left py-4 px-6 font-semibold text-white">Status</th>
+                <th className="text-left py-4 px-6 font-semibold text-white">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pendingMembersList.map((member, index) => (
+                <tr key={member.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-amber-50/30'} hover:bg-amber-50 transition-colors`}>
+                  <td className="py-4 px-6 text-gray-600 font-medium">
+                    {member.studentId || 'N/A'}
+                  </td>
+                  <td className="py-4 px-6">
+                    <div>
+                      <p className="font-semibold text-gray-900">{member.name || 'No name'}</p>
+                      <p className="text-sm text-gray-500">{member.email}</p>
+                    </div>
+                  </td>
+                  <td className="py-4 px-6 text-gray-600">{member.course || 'BSIT'}</td>
+                  <td className="py-4 px-6 text-gray-600">{member.year || 'N/A'}</td>
+                  <td className="py-4 px-6">
+                    <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-yellow-100 text-yellow-700">
+                      Pending
+                    </span>
+                  </td>
+                  <td className="py-4 px-6">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApprove(member.id, member.source)}
+                        className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-200 transition-colors flex items-center gap-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleReject(member.id, member.source)}
+                        className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors flex items-center gap-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Reject
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Active Members Section */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-blue-100/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Active Members</h2>
+              <p className="text-sm text-gray-500">{activeMembersList.length} approved member{activeMembersList.length !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-12">
             <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
             <p className="text-gray-500">Loading members...</p>
           </div>
-        ) : filteredMembers.length === 0 ? (
-          <div className="text-center py-16">
+        ) : activeMembersList.length === 0 ? (
+          <div className="text-center py-12">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -357,7 +422,7 @@ const AdminMembers = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredMembers.map((member, index) => (
+              {activeMembersList.map((member, index) => (
                 <tr key={member.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} hover:bg-blue-50/50 transition-colors`}>
                   <td className="py-4 px-6 text-gray-600 font-medium">
                     {member.studentId || 'N/A'}
@@ -382,49 +447,24 @@ const AdminMembers = () => {
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex gap-2">
-                      {member.status === 'pending' ? (
-                        <>
-                          <button
-                            onClick={() => handleApprove(member.id, member.source)}
-                            className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-200 transition-colors flex items-center gap-1"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleReject(member.id, member.source)}
-                            className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors flex items-center gap-1"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                            Reject
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => handleEditClick(member)}
-                            className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(member.id, member.source)}
-                            className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors flex items-center gap-1"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            Delete
-                          </button>
-                        </>
-                      )}
+                      <button
+                        onClick={() => handleEditClick(member)}
+                        className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(member.id, member.source)}
+                        className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors flex items-center gap-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete
+                      </button>
                     </div>
                   </td>
                 </tr>

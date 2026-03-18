@@ -3,6 +3,24 @@ import { getAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnounc
 import Modal from '../../components/common/Modal';
 import ImageUploader from '../../components/common/ImageUploader';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
+
+const quillModules = {
+  toolbar: [
+    [{ 'header': [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+    [{ 'align': [] }],
+    ['link'],
+    ['clean']
+  ],
+};
+
+const quillFormats = [
+  'header', 'bold', 'italic', 'underline', 'strike',
+  'list', 'align', 'link'
+];
 
 const AdminAnnouncements = () => {
   const [announcements, setAnnouncements] = useState([]);
@@ -20,7 +38,7 @@ const AdminAnnouncements = () => {
 
   const categories = ['Academic', 'Achievement', 'Competition', 'Event', 'General'];
   const statuses = ['Published', 'Draft'];
-  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm' });
   const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
@@ -70,7 +88,8 @@ const AdminAnnouncements = () => {
     setConfirmDialog({
       isOpen: true,
       title: 'Delete Announcement',
-      message: 'Are you sure you want to delete this announcement? This action cannot be undone.',
+      message: 'Are you sure you want to permanently delete this announcement? This action cannot be undone.',
+      confirmText: 'Delete',
       onConfirm: async () => {
         try {
           await deleteAnnouncement(id);
@@ -89,6 +108,7 @@ const AdminAnnouncements = () => {
       isOpen: true,
       title: 'Archive Announcement',
       message: 'Are you sure you want to archive this announcement? It will be hidden from the public page.',
+      confirmText: 'Archive',
       onConfirm: async () => {
         try {
           await archiveAnnouncement(id);
@@ -168,11 +188,13 @@ const AdminAnnouncements = () => {
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Content</label>
-            <textarea
+            <ReactQuill
+              theme="snow"
               value={formData.content}
-              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              rows="4"
-              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+              onChange={(value) => setFormData({ ...formData, content: value })}
+              modules={quillModules}
+              formats={quillFormats}
+              className="bg-white rounded-xl [&_.ql-toolbar]:rounded-t-xl [&_.ql-toolbar]:border-gray-200 [&_.ql-container]:rounded-b-xl [&_.ql-container]:border-gray-200 [&_.ql-editor]:min-h-[120px]"
             />
           </div>
 
@@ -375,7 +397,7 @@ const AdminAnnouncements = () => {
         onConfirm={confirmDialog.onConfirm}
         title={confirmDialog.title}
         message={confirmDialog.message}
-        confirmText="Delete"
+        confirmText={confirmDialog.confirmText || 'Confirm'}
       />
     </div>
   );

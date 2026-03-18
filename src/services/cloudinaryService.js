@@ -17,6 +17,10 @@ export const uploadImage = async (file, folder = 'ssite') => {
       throw new Error('Cloudinary cloud name not configured. Check your .env file.');
     }
 
+    if (!UPLOAD_PRESET || UPLOAD_PRESET === 'your_upload_preset_here') {
+      throw new Error('Cloudinary upload preset not configured. Check your .env file.');
+    }
+
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', UPLOAD_PRESET);
@@ -28,8 +32,14 @@ export const uploadImage = async (file, folder = 'ssite') => {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error?.message || 'Upload failed');
+      let errorMessage = 'Upload failed';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error?.message || errorMessage;
+      } catch {
+        errorMessage = `Upload failed with status ${response.status}`;
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
@@ -42,7 +52,7 @@ export const uploadImage = async (file, folder = 'ssite') => {
     console.error('Cloudinary upload error:', error);
     return {
       success: false,
-      error: error.message,
+      error: error.message || 'Upload failed. Please try again.',
     };
   }
 };

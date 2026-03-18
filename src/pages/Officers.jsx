@@ -4,14 +4,40 @@ import { getOfficers } from '../services/officerService';
 const Officers = () => {
   const [officers, setOfficers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState('');
+  const [selectedStartYear, setSelectedStartYear] = useState('');
+  const [selectedEndYear, setSelectedEndYear] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+
+  const parseAcademicTerm = (term) => {
+    const termText = (term || '').toString();
+    const matchedYears = termText.match(/\d{4}/g) || [];
+
+    if (matchedYears.length >= 2) {
+      return {
+        startYear: matchedYears[0],
+        endYear: matchedYears[1]
+      };
+    }
+
+    if (matchedYears.length === 1) {
+      const startYear = matchedYears[0];
+      return {
+        startYear,
+        endYear: String(Number(startYear) + 1)
+      };
+    }
+
+    return {
+      startYear: '',
+      endYear: ''
+    };
+  };
 
   // Generate dynamic year options from officers data + a reasonable range
   const currentYear = new Date().getFullYear();
-  const yearOptions = [];
+  const allYearOptions = [];
   for (let y = currentYear + 1; y >= 2020; y--) {
-    yearOptions.push(`${y}-${y + 1}`);
+    allYearOptions.push(`${y}`);
   }
 
   useEffect(() => {
@@ -19,12 +45,22 @@ const Officers = () => {
   }, []);
 
   useEffect(() => {
-    // Set the default selected year to the most recent term found in officers
-    if (officers.length > 0 && !selectedYear) {
-      const terms = [...new Set(officers.map(o => o.term).filter(Boolean))].sort().reverse();
-      setSelectedYear(terms[0] || yearOptions[0]);
+    // Set default filter to the latest academic year in data.
+    if (officers.length > 0 && (!selectedStartYear || !selectedEndYear)) {
+      const terms = [...new Set(officers.map((officer) => officer.term).filter(Boolean))]
+        .map((term) => parseAcademicTerm(term))
+        .filter((term) => term.startYear && term.endYear)
+        .sort((a, b) => Number(b.startYear) - Number(a.startYear));
+
+      if (terms.length > 0) {
+        setSelectedStartYear(terms[0].startYear);
+        setSelectedEndYear(terms[0].endYear);
+      } else {
+        setSelectedStartYear(allYearOptions[0]);
+        setSelectedEndYear(String(Number(allYearOptions[0]) + 1));
+      }
     }
-  }, [officers]);
+  }, [officers, selectedStartYear, selectedEndYear]);
 
   const loadOfficers = async () => {
     try {
@@ -38,9 +74,18 @@ const Officers = () => {
     }
   };
 
+  const handleStartYearChange = (e) => {
+    setSelectedStartYear(e.target.value);
+  };
+
+  const handleEndYearChange = (e) => {
+    setSelectedEndYear(e.target.value);
+  };
+
   const filteredOfficers = officers.filter((officer) => {
-    const matchesTerm = officer.term === selectedYear;
-    const matchesSearch = searchTerm === '' || 
+    const term = parseAcademicTerm(officer.term);
+    const matchesTerm = term.startYear === selectedStartYear && term.endYear === selectedEndYear;
+    const matchesSearch = searchTerm === '' ||
       officer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       officer.position?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesTerm && matchesSearch;
@@ -56,10 +101,10 @@ const Officers = () => {
         </div>
 
         {/* Search & Filter */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-10 max-w-2xl mx-auto">
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Search Bar */}
-            <div className="flex-1 relative">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-10 max-w-3xl mx-auto">
+          {/* Search Bar */}
+          <div className="mb-4">
+            <div className="relative">
               <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -71,20 +116,48 @@ const Officers = () => {
                 className="w-full border-2 border-gray-200 rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
             </div>
-            {/* Year Dropdown */}
-            <div className="relative min-w-[180px]">
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                className="w-full border-2 border-gray-200 rounded-xl px-5 py-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white font-medium text-gray-700 cursor-pointer"
-              >
-                {yearOptions.map(yr => (
-                  <option key={yr} value={yr}>{yr}</option>
-                ))}
-              </select>
-              <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+          </div>
+
+          {/* Two separate year dropdowns */}
+          <div className="flex gap-4">
+            {/* Primary year dropdown */}
+            <div className="flex-1">
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Start Year</label>
+              <div className="relative">
+                <select
+                  value={selectedStartYear}
+                  onChange={handleStartYearChange}
+                  className="w-full border-2 rounded-xl px-5 py-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white font-medium cursor-pointer transition-all border-blue-500 text-blue-900"
+                >
+                  <option value="" disabled>Select year...</option>
+                  {allYearOptions.map(yr => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
+                </select>
+                <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Secondary year dropdown */}
+            <div className="flex-1">
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">End Year</label>
+              <div className="relative">
+                <select
+                  value={selectedEndYear}
+                  onChange={handleEndYearChange}
+                  className="w-full border-2 rounded-xl px-5 py-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white font-medium cursor-pointer transition-all border-blue-500 text-blue-900"
+                >
+                  <option value="" disabled>Select year...</option>
+                  {allYearOptions.map(yr => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
+                </select>
+                <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </div>
           </div>
         </div>
@@ -112,20 +185,20 @@ const Officers = () => {
                   {/* Officer Photo */}
                   <div className="w-full aspect-square bg-gray-100 overflow-hidden relative">
                     {officer.image ? (
-                      <img 
-                        src={officer.image} 
+                      <img
+                        src={officer.image}
                         alt={officer.name}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
+                      <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-blue-900 to-blue-700">
                         <span className="text-5xl font-bold text-white">
                           {officer.name?.charAt(0) || '?'}
                         </span>
                       </div>
                     )}
                     {/* Overlay on hover */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-blue-900/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-4">
+                    <div className="absolute inset-0 bg-linear-to-t from-blue-900/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-4">
                       <span className="text-white text-sm font-medium">{officer.term}</span>
                     </div>
                   </div>

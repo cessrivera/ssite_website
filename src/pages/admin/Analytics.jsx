@@ -1,101 +1,101 @@
 import { useState, useEffect } from 'react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend
+} from 'recharts';
 import { getAnnouncements } from '../../services/announcementService';
 import { getEvents } from '../../services/eventService';
 import { getOfficers } from '../../services/officerService';
 import { getPolls } from '../../services/pollService';
 import { getMembers } from '../../services/memberService';
 import { getMessages } from '../../services/messageService';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
+const COLORS = {
+  blue: '#1d4ed8',
+  lightBlue: '#3b82f6',
+  sky: '#60a5fa',
+  green: '#16a34a',
+  lightGreen: '#4ade80',
+  amber: '#d97706',
+  yellow: '#fbbf24',
+  purple: '#7c3aed',
+  indigo: '#4f46e5',
+  red: '#dc2626',
+  gray: '#6b7280',
+  lightGray: '#d1d5db',
+  emerald: '#059669',
+  teal: '#0d9488',
+};
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3 text-sm">
+        {label && <p className="font-semibold text-gray-700 mb-1">{label}</p>}
+        {payload.map((p, i) => (
+          <p key={i} style={{ color: p.color }} className="font-medium">
+            {p.name}: {p.value}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 const Analytics = () => {
-  const [stats, setStats] = useState({
-    totalAnnouncements: 0,
-    publishedAnnouncements: 0,
-    draftAnnouncements: 0,
-    archivedAnnouncements: 0,
-    totalEvents: 0,
-    upcomingEvents: 0,
-    pastEvents: 0,
-    archivedEvents: 0,
-    totalMembers: 0,
-    activeMembers: 0,
-    pendingMembers: 0,
-    totalAdmins: 0,
-    totalPolls: 0,
-    activePolls: 0,
-    inactivePolls: 0,
-    totalVotes: 0,
-    pollResults: [],
-    totalMessages: 0,
-    unreadMessages: 0,
-    repliedMessages: 0,
-    totalOfficers: 0,
-    officersByTerm: [],
-    totalRegistrations: 0
-  });
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadAnalytics();
-  }, []);
+  useEffect(() => { loadAnalytics(); }, []);
 
   const loadAnalytics = async () => {
     try {
-      // Load all data
       const [announcements, events, officers, polls, members, messages] = await Promise.all([
-        getAnnouncements(),
-        getEvents(),
-        getOfficers(),
-        getPolls(),
-        getMembers(),
-        getMessages()
+        getAnnouncements(), getEvents(), getOfficers(), getPolls(), getMembers(), getMessages()
       ]);
 
-      // Get users collection for admin and status info
       const usersSnapshot = await getDocs(collection(db, 'users'));
       const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      // Get event registrations count
       const registrationsSnapshot = await getDocs(collection(db, 'eventRegistrations'));
       const totalRegistrations = registrationsSnapshot.size;
 
-      // Announcement stats
-      const publishedAnnouncements = announcements.filter(a => a.status === 'Published' && !a.archived).length;
-      const draftAnnouncements = announcements.filter(a => a.status === 'Draft' && !a.archived).length;
-      const archivedAnnouncements = announcements.filter(a => a.archived).length;
+      // Announcements
+      const publishedAnn = announcements.filter(a => a.status === 'Published' && !a.archived).length;
+      const draftAnn = announcements.filter(a => a.status === 'Draft' && !a.archived).length;
+      const archivedAnn = announcements.filter(a => a.archived).length;
 
-      // Event stats
+      // Events
       const today = new Date();
       const activeEvents = events.filter(e => !e.archived);
       const upcomingEvents = activeEvents.filter(e => new Date(e.date) >= today).length;
       const pastEvents = activeEvents.filter(e => new Date(e.date) < today).length;
       const archivedEvents = events.filter(e => e.archived).length;
 
-      // Member stats
+      // Members
       const adminUsers = users.filter(u => u.role === 'admin');
       const activeMembers = users.filter(u => u.role !== 'admin' && u.status === 'active').length;
       const pendingMembers = users.filter(u => u.role !== 'admin' && u.status === 'pending').length;
-      const memberCollectionCount = members.length;
-      const totalMembers = activeMembers + pendingMembers + memberCollectionCount;
+      const totalMembers = activeMembers + pendingMembers + members.length;
 
-      // Poll stats
+      // Polls
       const activePolls = polls.filter(p => p.active).length;
       const inactivePolls = polls.filter(p => !p.active).length;
       const totalVotes = polls.reduce((sum, p) => sum + (p.totalVotes || 0), 0);
+      const pollResults = polls
+        .map(p => ({ question: p.question, totalVotes: p.totalVotes || 0, options: p.options || [], active: p.active }))
+        .sort((a, b) => b.totalVotes - a.totalVotes)
+        .slice(0, 6);
 
-      const pollResults = polls.map(p => ({
-        question: p.question,
-        totalVotes: p.totalVotes || 0,
-        options: p.options || [],
-        active: p.active
-      })).sort((a, b) => b.totalVotes - a.totalVotes).slice(0, 5);
-
-      // Message stats
+      // Messages
       const unreadMessages = messages.filter(m => m.status === 'unread').length;
       const repliedMessages = messages.filter(m => m.status === 'replied').length;
+      const readMessages = messages.filter(m => m.status === 'read').length;
 
-      // Officers stats by term
+      // Officers by term
       const termMap = {};
       officers.forEach(o => {
         const term = o.term || 'Unknown';
@@ -103,32 +103,58 @@ const Analytics = () => {
       });
       const officersByTerm = Object.entries(termMap)
         .map(([term, count]) => ({ term, count }))
-        .sort((a, b) => b.term.localeCompare(a.term));
+        .sort((a, b) => b.term.localeCompare(a.term))
+        .slice(0, 6);
+
+      // Content overview for bar chart
+      const contentOverview = [
+        { name: 'Announcements', total: announcements.length, active: publishedAnn, inactive: draftAnn + archivedAnn },
+        { name: 'Events', total: events.length, active: upcomingEvents, inactive: pastEvents + archivedEvents },
+        { name: 'Polls', total: polls.length, active: activePolls, inactive: inactivePolls },
+        { name: 'Messages', total: messages.length, active: repliedMessages, inactive: unreadMessages },
+        { name: 'Officers', total: officers.length, active: officers.length, inactive: 0 },
+      ];
 
       setStats({
         totalAnnouncements: announcements.length,
-        publishedAnnouncements,
-        draftAnnouncements,
-        archivedAnnouncements,
+        publishedAnn, draftAnn, archivedAnn,
         totalEvents: events.length,
-        upcomingEvents,
-        pastEvents,
-        archivedEvents,
-        totalMembers,
-        activeMembers,
-        pendingMembers,
+        upcomingEvents, pastEvents, archivedEvents,
+        totalMembers, activeMembers, pendingMembers,
         totalAdmins: adminUsers.length,
         totalPolls: polls.length,
-        activePolls,
-        inactivePolls,
-        totalVotes,
+        activePolls, inactivePolls, totalVotes,
         pollResults,
         totalMessages: messages.length,
-        unreadMessages,
-        repliedMessages,
+        unreadMessages, repliedMessages, readMessages,
         totalOfficers: officers.length,
         officersByTerm,
-        totalRegistrations
+        totalRegistrations,
+        contentOverview,
+        // Chart data
+        announcementsBreakdown: [
+          { name: 'Published', value: publishedAnn },
+          { name: 'Draft', value: draftAnn },
+          { name: 'Archived', value: archivedAnn },
+        ],
+        eventsBreakdown: [
+          { name: 'Upcoming', value: upcomingEvents },
+          { name: 'Past', value: pastEvents },
+          { name: 'Archived', value: archivedEvents },
+        ],
+        membersBreakdown: [
+          { name: 'Active', value: activeMembers },
+          { name: 'Pending', value: pendingMembers },
+        ],
+        messagesBreakdown: [
+          { name: 'Unread', value: unreadMessages },
+          { name: 'Replied', value: repliedMessages },
+          { name: 'Read', value: readMessages },
+        ],
+        pollsBreakdown: [
+          { name: 'Active', value: activePolls },
+          { name: 'Closed', value: inactivePolls },
+        ],
       });
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -139,9 +165,9 @@ const Analytics = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-500">Loading analytics...</p>
         </div>
       </div>
@@ -152,229 +178,172 @@ const Analytics = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
         <p className="text-gray-500 mt-1">System-wide statistics and insights</p>
       </div>
 
-      {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Announcements */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-600">Announcements</h3>
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.totalAnnouncements}</p>
-          <p className="text-xs text-gray-500 mt-2">
-            <span className="text-green-600 font-semibold">{stats.publishedAnnouncements}</span> Published,
-            <span className="text-amber-600 font-semibold ml-1">{stats.draftAnnouncements}</span> Draft,
-            <span className="text-gray-400 font-semibold ml-1">{stats.archivedAnnouncements}</span> Archived
-          </p>
-        </div>
-
-        {/* Events */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-600">Events</h3>
-            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.totalEvents}</p>
-          <p className="text-xs text-gray-500 mt-2">
-            <span className="text-blue-600 font-semibold">{stats.upcomingEvents}</span> Upcoming,
-            <span className="text-gray-600 font-semibold ml-1">{stats.pastEvents}</span> Past,
-            <span className="text-gray-400 font-semibold ml-1">{stats.archivedEvents}</span> Archived
-          </p>
-        </div>
-
-        {/* Members */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-600">Members</h3>
-            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.totalMembers}</p>
-          <p className="text-xs text-gray-500 mt-2">
-            <span className="text-green-600 font-semibold">{stats.activeMembers}</span> Active,
-            <span className="text-yellow-600 font-semibold ml-1">{stats.pendingMembers}</span> Pending
-          </p>
-        </div>
-
-        {/* Messages */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-600">Messages</h3>
-            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.totalMessages}</p>
-          <p className="text-xs text-gray-500 mt-2">
-            <span className="text-blue-600 font-semibold">{stats.unreadMessages}</span> Unread,
-            <span className="text-green-600 font-semibold ml-1">{stats.repliedMessages}</span> Replied
-          </p>
-        </div>
-      </div>
-
-      {/* Second Row: Officers, Registrations, Admins */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Officers */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-600">Officers</h3>
-            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.totalOfficers}</p>
-          {stats.officersByTerm.length > 0 && (
-            <div className="mt-3 space-y-1">
-              {stats.officersByTerm.slice(0, 3).map(({ term, count }) => (
-                <div key={term} className="flex justify-between text-xs">
-                  <span className="text-gray-500">{term}</span>
-                  <span className="font-semibold text-gray-700">{count}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Event Registrations */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-600">Event Registrations</h3>
-            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.totalRegistrations}</p>
-          <p className="text-xs text-gray-500 mt-2">Total event sign-ups</p>
-        </div>
-
-        {/* Admins */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-600">Administrators</h3>
-            <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.totalAdmins}</p>
-          <p className="text-xs text-gray-500 mt-2">System administrators</p>
-        </div>
-      </div>
-
-      {/* Polls Analytics */}
+      {/* Content Overview Bar Chart + Members Donut */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Polls Summary */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-bold text-gray-900">Polls Overview</h3>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-semibold text-gray-700">Total Polls</span>
-              <span className="text-2xl font-bold text-gray-900">{stats.totalPolls}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-semibold text-gray-700">Total Votes Cast</span>
-              <span className="text-2xl font-bold text-blue-600">{stats.totalVotes}</span>
-            </div>
-            
-            <div className="pt-2 border-t border-gray-100">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-gray-600">Active</span>
-                <span className="text-sm font-bold text-green-600">{stats.activePolls}</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-1.5">
-                <div 
-                  className="bg-green-600 h-1.5 rounded-full transition-all"
-                  style={{ width: `${stats.totalPolls > 0 ? (stats.activePolls / stats.totalPolls) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-gray-600">Closed</span>
-                <span className="text-sm font-bold text-gray-600">{stats.inactivePolls}</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-1.5">
-                <div 
-                  className="bg-gray-600 h-1.5 rounded-full transition-all"
-                  style={{ width: `${stats.totalPolls > 0 ? (stats.inactivePolls / stats.totalPolls) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
-          </div>
+        {/* Content Overview — clustered bar */}
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Content Overview</h3>
+          <p className="text-sm text-gray-500 mb-5">Active vs inactive content across all categories</p>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={stats.contentOverview} barCategoryGap="30%" barGap={4}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+              <Bar dataKey="active" name="Active" fill={COLORS.blue} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="inactive" name="Inactive / Archived" fill={COLORS.sky} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
 
-        {/* Top Polls with Results */}
+        {/* Members Donut */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Member Status</h3>
+          <p className="text-sm text-gray-500 mb-4">Active vs pending members</p>
+          <div className="flex-1 flex items-center justify-center">
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={stats.membersBreakdown}
+                  cx="50%" cy="50%"
+                  innerRadius={60} outerRadius={90}
+                  paddingAngle={3}
+                  dataKey="value"
+                >
+                  {stats.membersBreakdown.map((_, i) => (
+                    <Cell key={i} fill={[COLORS.blue, COLORS.sky][i % 2]} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="text-center mt-2">
+            <p className="text-2xl font-bold text-gray-900">{stats.totalMembers}</p>
+            <p className="text-sm text-gray-500">Total members</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Events Breakdown + Messages Breakdown */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Events Area/Bar */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Events Breakdown</h3>
+          <p className="text-sm text-gray-500 mb-5">Upcoming, past, and archived events</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={stats.eventsBreakdown} barCategoryGap="40%">
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="value" name="Events" radius={[6, 6, 0, 0]}>
+                {stats.eventsBreakdown.map((_, i) => (
+                  <Cell key={i} fill={[COLORS.indigo, COLORS.lightBlue, COLORS.lightGray][i]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Messages Donut */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Messages Breakdown</h3>
+          <p className="text-sm text-gray-500 mb-4">Unread, replied, and read messages</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie
+                data={stats.messagesBreakdown}
+                cx="50%" cy="50%"
+                innerRadius={55} outerRadius={85}
+                paddingAngle={3}
+                dataKey="value"
+                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                labelLine={false}
+              >
+                {stats.messagesBreakdown.map((_, i) => (
+                  <Cell key={i} fill={[COLORS.red, COLORS.green, COLORS.gray][i]} />
+                ))}
+              </Pie>
+              <Tooltip content={<CustomTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Polls Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Polls active/closed donut */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col items-center">
+          <h3 className="text-lg font-bold text-gray-900 mb-1 self-start">Poll Status</h3>
+          <p className="text-sm text-gray-500 mb-4 self-start">Active vs closed polls</p>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie
+                data={stats.pollsBreakdown}
+                cx="50%" cy="50%"
+                innerRadius={55} outerRadius={80}
+                paddingAngle={4}
+                dataKey="value"
+              >
+                {stats.pollsBreakdown.map((_, i) => (
+                  <Cell key={i} fill={[COLORS.amber, COLORS.lightGray][i]} />
+                ))}
+              </Pie>
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+            </PieChart>
+          </ResponsiveContainer>
+          <p className="text-3xl font-bold text-gray-900 mt-1">{stats.totalVotes}</p>
+          <p className="text-sm text-gray-500">total votes</p>
+        </div>
+
+        {/* Top Polls by Votes — horizontal bars */}
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-6">Top Polls by Participation</h3>
-          
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Top Polls by Participation</h3>
+          <p className="text-sm text-gray-500 mb-5">Polls ranked by total votes received</p>
           {stats.pollResults.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No polls created yet</p>
+            <div className="flex items-center justify-center h-40">
+              <p className="text-gray-400">No polls created yet</p>
             </div>
           ) : (
-            <div className="space-y-5">
-              {stats.pollResults.map((poll, index) => {
-                const maxVotes = Math.max(...poll.options.map(o => o.votes || 0), 1);
+            <div className="space-y-4">
+              {stats.pollResults.map((poll, i) => {
+                const maxVotes = Math.max(...stats.pollResults.map(p => p.totalVotes), 1);
+                const pct = Math.round((poll.totalVotes / maxVotes) * 100);
                 return (
-                  <div key={index} className="border border-gray-200 rounded-xl p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900 line-clamp-1">{poll.question}</h4>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {poll.totalVotes} total votes
-                          {poll.active && <span className="ml-2 text-green-600 font-semibold">Active</span>}
-                        </p>
+                  <div key={i}>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm text-gray-700 font-medium truncate max-w-xs">{poll.question}</span>
+                      <span className="text-sm font-bold text-blue-700 ml-2 whitespace-nowrap">{poll.totalVotes} votes</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-3">
+                      <div
+                        className="h-3 rounded-full transition-all duration-500"
+                        style={{
+                          width: `${pct}%`,
+                          background: `linear-gradient(90deg, ${COLORS.blue}, ${COLORS.sky})`
+                        }}
+                      />
+                    </div>
+                    {poll.options.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-1.5">
+                        {poll.options.slice(0, 3).map((opt, j) => {
+                          const optPct = poll.totalVotes > 0 ? Math.round(((opt.votes || 0) / poll.totalVotes) * 100) : 0;
+                          return (
+                            <span key={j} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                              {opt.text}: {optPct}%
+                            </span>
+                          );
+                        })}
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      {poll.options.slice(0, 4).map((option, idx) => {
-                        const votes = option.votes || 0;
-                        const pct = poll.totalVotes > 0 ? Math.round((votes / poll.totalVotes) * 100) : 0;
-                        return (
-                          <div key={idx} className="flex items-center gap-3">
-                            <span className="text-xs text-gray-600 w-24 truncate">{option.text}</span>
-                            <div className="flex-1 bg-gray-100 rounded-full h-3">
-                              <div
-                                className="bg-gradient-to-r from-blue-500 to-blue-700 h-3 rounded-full transition-all"
-                                style={{ width: `${maxVotes > 0 ? (votes / maxVotes) * 100 : 0}%` }}
-                              />
-                            </div>
-                            <span className="text-xs font-semibold text-gray-700 w-12 text-right">{pct}%</span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    )}
                   </div>
                 );
               })}
@@ -383,24 +352,57 @@ const Analytics = () => {
         </div>
       </div>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl shadow-sm p-6 text-white">
-          <h3 className="text-sm font-semibold text-blue-100 mb-2">System Status</h3>
-          <p className="text-lg">{stats.totalMembers > 0 ? 'Active' : 'Setting up'}</p>
-          <p className="text-xs text-blue-100 mt-3">{stats.totalMembers} registered members</p>
+      {/* Officers by Term */}
+      {stats.officersByTerm.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Officers by Term</h3>
+          <p className="text-sm text-gray-500 mb-5">Number of officers per academic term</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={stats.officersByTerm} barCategoryGap="40%">
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+              <XAxis dataKey="term" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="count" name="Officers" fill={COLORS.teal} radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Announcements Breakdown */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Announcements Status</h3>
+          <p className="text-sm text-gray-500 mb-5">Published, draft, and archived counts</p>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={stats.announcementsBreakdown} barCategoryGap="45%">
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="value" name="Count" radius={[6, 6, 0, 0]}>
+                {stats.announcementsBreakdown.map((_, i) => (
+                  <Cell key={i} fill={[COLORS.green, COLORS.amber, COLORS.lightGray][i]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
 
-        <div className="bg-gradient-to-br from-green-500 to-green-700 rounded-2xl shadow-sm p-6 text-white">
-          <h3 className="text-sm font-semibold text-green-100 mb-2">Content Published</h3>
-          <p className="text-lg">{stats.publishedAnnouncements + stats.totalEvents + (stats.activePolls || 0)}</p>
-          <p className="text-xs text-green-100 mt-3">Announcements, Events & Active Polls</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-500 to-purple-700 rounded-2xl shadow-sm p-6 text-white">
-          <h3 className="text-sm font-semibold text-purple-100 mb-2">Engagement Rate</h3>
-          <p className="text-lg">{stats.totalMembers > 0 ? Math.round((stats.activeMembers / stats.totalMembers) * 100) : 0}%</p>
-          <p className="text-xs text-purple-100 mt-3">Active member participation</p>
+        {/* Summary gradient cards */}
+        <div className="grid grid-cols-1 gap-4">
+          <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-5 text-white">
+            <p className="text-blue-200 text-sm font-semibold">Content Published</p>
+            <p className="text-4xl font-bold mt-1">{stats.publishedAnn + stats.totalEvents + stats.activePolls}</p>
+            <p className="text-blue-200 text-xs mt-2">Announcements, events & active polls</p>
+          </div>
+          <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-2xl p-5 text-white">
+            <p className="text-emerald-200 text-sm font-semibold">Engagement Rate</p>
+            <p className="text-4xl font-bold mt-1">
+              {stats.totalMembers > 0 ? Math.round((stats.activeMembers / stats.totalMembers) * 100) : 0}%
+            </p>
+            <p className="text-emerald-200 text-xs mt-2">Active member participation</p>
+          </div>
         </div>
       </div>
     </div>

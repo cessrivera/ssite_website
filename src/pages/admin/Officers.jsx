@@ -4,6 +4,16 @@ import ImageUploader from '../../components/common/ImageUploader';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 
 const AdminOfficers = () => {
+  const now = new Date();
+  const currentCalendarYear = now.getFullYear();
+  const currentAcademicStartYear = now.getMonth() >= 6 ? currentCalendarYear : currentCalendarYear - 1;
+  const minYear = 2020;
+  const maxYear = currentCalendarYear + 6;
+  const yearOptions = Array.from(
+    { length: maxYear - minYear + 1 },
+    (_, index) => String(minYear + index)
+  );
+
   const [officers, setOfficers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -13,25 +23,56 @@ const AdminOfficers = () => {
     position: '',
     course: 'BSIT',
     year: '',
-    term: '2025-2026',
+    term: `${currentAcademicStartYear}-${currentAcademicStartYear + 1}`,
     image: '',
     order: 0
   });
+  const [selectedStartYear, setSelectedStartYear] = useState(String(currentAcademicStartYear));
+  const [selectedEndYear, setSelectedEndYear] = useState(String(currentAcademicStartYear + 1));
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
 
   const courses = ['BSIT', 'BSIS', 'BSCS', 'WMAD'];
   const years = ['1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B'];
 
-  // Generate dynamic term options
-  const currentYear = new Date().getFullYear();
-  const termOptions = [];
-  for (let y = currentYear + 1; y >= 2020; y--) {
-    termOptions.push(`${y}-${y + 1}`);
-  }
+  const computedEndYear = String(Number(selectedStartYear) + 1);
+  const endYearOptions = [computedEndYear];
+
+  const parseAcademicTerm = (term) => {
+    const termText = (term || '').toString();
+    const matchedYears = termText.match(/\d{4}/g) || [];
+
+    if (matchedYears.length >= 2) {
+      const startYear = matchedYears[0];
+      return {
+        startYear,
+        endYear: String(Number(startYear) + 1)
+      };
+    }
+
+    if (matchedYears.length === 1) {
+      const startYear = matchedYears[0];
+      return {
+        startYear,
+        endYear: String(Number(startYear) + 1)
+      };
+    }
+
+    return {
+      startYear: String(currentAcademicStartYear),
+      endYear: String(currentAcademicStartYear + 1)
+    };
+  };
 
   useEffect(() => {
     loadOfficers();
   }, []);
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      term: `${selectedStartYear}-${selectedEndYear}`
+    }));
+  }, [selectedStartYear, selectedEndYear]);
 
   const loadOfficers = async () => {
     try {
@@ -60,16 +101,20 @@ const AdminOfficers = () => {
   };
 
   const handleEdit = (officer) => {
+    const { startYear, endYear } = parseAcademicTerm(officer.term);
+
     setEditingOfficer(officer);
     setFormData({
       name: officer.name,
       position: officer.position || '',
       course: officer.course || 'BSIT',
       year: officer.year || '',
-      term: officer.term || '2025-2026',
+      term: `${startYear}-${endYear}`,
       image: officer.image || '',
       order: officer.order || 0
     });
+    setSelectedStartYear(startYear);
+    setSelectedEndYear(endYear);
     setShowForm(true);
   };
 
@@ -92,9 +137,24 @@ const AdminOfficers = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', position: '', course: 'BSIT', year: '', term: '2025-2026', image: '', order: 0 });
+    setSelectedStartYear(String(currentAcademicStartYear));
+    setSelectedEndYear(String(currentAcademicStartYear + 1));
+    setFormData({
+      name: '',
+      position: '',
+      course: 'BSIT',
+      year: '',
+      term: `${currentAcademicStartYear}-${currentAcademicStartYear + 1}`,
+      image: '',
+      order: 0
+    });
     setEditingOfficer(null);
     setShowForm(false);
+  };
+
+  const handleStartYearChange = (value) => {
+    setSelectedStartYear(value);
+    setSelectedEndYear(String(Number(value) + 1));
   };
 
   return (
@@ -110,7 +170,7 @@ const AdminOfficers = () => {
           className={`px-5 py-2.5 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 ${
             showForm 
               ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' 
-              : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:shadow-lg'
+              : 'bg-linear-to-r from-blue-600 to-blue-700 text-white hover:shadow-lg'
           }`}
         >
           {showForm ? (
@@ -163,7 +223,7 @@ const AdminOfficers = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Course</label>
                 <div className="relative">
@@ -202,21 +262,41 @@ const AdminOfficers = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Term / Academic Year</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Start Year</label>
                 <div className="relative">
                   <select
-                    value={formData.term}
-                    onChange={(e) => setFormData({ ...formData, term: e.target.value })}
+                    value={selectedStartYear}
+                    onChange={(e) => handleStartYearChange(e.target.value)}
                     className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white cursor-pointer transition-all"
                   >
-                    {termOptions.map(term => (
-                      <option key={term} value={term}>{term}</option>
+                    {yearOptions.map((year) => (
+                      <option key={year} value={year}>{year}</option>
                     ))}
                   </select>
                   <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">End Year</label>
+                <div className="relative">
+                  <select
+                    value={selectedEndYear}
+                    onChange={(e) => setSelectedEndYear(e.target.value)}
+                    disabled
+                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white cursor-pointer transition-all"
+                  >
+                    {endYearOptions.map((year) => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                  <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Saved as: {selectedStartYear}-{selectedEndYear}</p>
               </div>
 
               <div>
@@ -240,7 +320,7 @@ const AdminOfficers = () => {
             <div className="flex gap-3 pt-2">
               <button
                 type="submit"
-                className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center gap-2"
+                className="bg-linear-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center gap-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -279,7 +359,7 @@ const AdminOfficers = () => {
           {officers.map((officer) => (
             <div key={officer.id} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-shadow group">
               {/* Photo */}
-              <div className="w-full aspect-square bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center relative overflow-hidden">
+              <div className="w-full aspect-square bg-linear-to-br from-blue-600 to-blue-700 flex items-center justify-center relative overflow-hidden">
                 {officer.image ? (
                   <img 
                     src={officer.image} 

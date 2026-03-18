@@ -2,6 +2,24 @@ import { useState, useEffect } from 'react';
 import { getEvents, createEvent, updateEvent, deleteEvent, archiveEvent, unarchiveEvent } from '../../services/eventService';
 import ImageUploader from '../../components/common/ImageUploader';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
+
+const quillModules = {
+  toolbar: [
+    [{ 'header': [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+    [{ 'align': [] }],
+    ['link'],
+    ['clean']
+  ],
+};
+
+const quillFormats = [
+  'header', 'bold', 'italic', 'underline', 'strike',
+  'list', 'align', 'link'
+];
 
 const AdminEvents = () => {
   const [events, setEvents] = useState([]);
@@ -209,11 +227,13 @@ const AdminEvents = () => {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-              <textarea
+              <ReactQuill
+                theme="snow"
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows="3"
-                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                onChange={(value) => setFormData({ ...formData, description: value })}
+                modules={quillModules}
+                formats={quillFormats}
+                className="bg-white rounded-xl [&_.ql-toolbar]:rounded-t-xl [&_.ql-toolbar]:border-gray-200 [&_.ql-container]:rounded-b-xl [&_.ql-container]:border-gray-200 [&_.ql-editor]:min-h-[100px]"
               />
             </div>
 

@@ -6,7 +6,7 @@ This project now points new uploads to:
 ## 1. In the new Cloudinary account
 1. Create an unsigned upload preset named `site_uploads`.
 2. Ensure folder mode allows paths like `ssite/officers`, `ssite/events`, etc.
-3. Get API credentials from Dashboard:
+3. Get API credentials from Dashboard:![1773561902660](image/CLOUDINARY_MIGRATION_STEPS/1773561902660.png)
    - Cloud name
    - API key
    - API secret

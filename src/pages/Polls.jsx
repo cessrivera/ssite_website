@@ -9,6 +9,61 @@ const Polls = () => {
   const [selectedOption, setSelectedOption] = useState(null);
   const { currentUser } = useAuth();
 
+  const pollVisualThemes = [
+    {
+      keywords: ['time', 'schedule', 'timing', 'oras'],
+      emoji: '🕒',
+      label: 'Time Preference',
+      bannerClass: 'from-indigo-600 via-blue-700 to-sky-700'
+    },
+    {
+      keywords: ['event', 'activity', 'program'],
+      emoji: '📅',
+      label: 'Event Poll',
+      bannerClass: 'from-blue-700 via-blue-800 to-cyan-700'
+    },
+    {
+      keywords: ['food', 'meal', 'snack', 'lunch', 'dinner'],
+      emoji: '🍽️',
+      label: 'Food Preference',
+      bannerClass: 'from-orange-600 via-amber-600 to-yellow-600'
+    },
+    {
+      keywords: ['venue', 'location', 'place'],
+      emoji: '📍',
+      label: 'Location Poll',
+      bannerClass: 'from-emerald-600 via-teal-600 to-cyan-700'
+    },
+    {
+      keywords: ['workshop', 'seminar', 'training', 'topic'],
+      emoji: '🎓',
+      label: 'Learning Poll',
+      bannerClass: 'from-violet-600 via-indigo-700 to-blue-800'
+    }
+  ];
+
+  const getPollVisual = (poll) => {
+    if (poll.imageUrl && poll.imageUrl.trim() !== '') {
+      return {
+        type: 'image',
+        label: 'Community Poll',
+        src: poll.imageUrl
+      };
+    }
+
+    const questionText = (poll.question || '').toLowerCase();
+    const theme = pollVisualThemes.find((entry) =>
+      entry.keywords.some((keyword) => questionText.includes(keyword))
+    );
+
+    return {
+      type: 'emoji',
+      emoji: theme?.emoji || '🗳️',
+      label: theme?.label || 'Community Poll',
+      bannerClass: theme?.bannerClass || 'from-blue-900 via-blue-800 to-blue-900'
+    };
+  };
+
   useEffect(() => {
     loadPolls();
   }, []);
@@ -75,9 +130,53 @@ const Polls = () => {
             {activePolls.map((poll) => {
               const hasVoted = currentUser && poll.votedUsers?.includes(currentUser.uid);
               const totalVotes = poll.totalVotes || 0;
+              const pollVisual = getPollVisual(poll);
 
               return (
                 <div key={poll.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  {/* Poll Visual Header */}
+                  {pollVisual.type === 'image' ? (
+                    <div className="relative h-40 md:h-48 overflow-hidden">
+                      <img
+                        src={pollVisual.src}
+                        alt={poll.question}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/30 to-transparent" />
+                      <div className="absolute left-5 right-5 bottom-4 flex items-center gap-3">
+                        <span className="bg-white/20 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full">
+                          {pollVisual.label}
+                        </span>
+                        {hasVoted && (
+                          <span className="ml-auto flex items-center gap-1 text-emerald-200 text-xs font-semibold bg-white/15 px-2.5 py-1 rounded-full">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Voted
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={`bg-linear-to-r ${pollVisual.bannerClass} px-6 py-5 flex items-center gap-3`}>
+                      <div className="w-11 h-11 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-xl">
+                        {pollVisual.emoji}
+                      </div>
+                      <span className="text-white/85 text-sm font-semibold tracking-wide">{pollVisual.label}</span>
+                      {hasVoted && (
+                        <span className="ml-auto flex items-center gap-1 text-emerald-200 text-xs font-semibold bg-white/15 px-2.5 py-1 rounded-full">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Voted
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Poll Header */}
                   <div className="p-6 md:p-8 border-b border-gray-100">
                     <h2 className="text-xl font-bold text-gray-900 mb-4">{poll.question}</h2>
@@ -119,7 +218,7 @@ const Polls = () => {
                                 ? 'bg-blue-50 border-2 border-blue-500 shadow-sm' 
                                 : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
                             }`}>
-                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
                                 selectedOption === idx ? 'border-blue-500' : 'border-gray-300'
                               }`}>
                                 {selectedOption === idx && (
@@ -127,7 +226,7 @@ const Polls = () => {
                                 )}
                               </div>
                               <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center flex-shrink-0">
+                                <div className="w-9 h-9 rounded-lg bg-linear-to-br from-blue-100 to-blue-50 flex items-center justify-center shrink-0">
                                   <span className="text-blue-700 font-bold text-sm">{String.fromCharCode(65 + idx)}</span>
                                 </div>
                                 <span className="font-medium text-gray-700">{option.text}</span>
@@ -139,7 +238,7 @@ const Polls = () => {
                           <button
                             onClick={() => handleVote(poll.id, selectedOption)}
                             disabled={selectedOption === null}
-                            className="bg-gradient-to-r from-blue-900 to-blue-700 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="bg-linear-to-r from-blue-900 to-blue-700 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -169,7 +268,7 @@ const Polls = () => {
                               <div key={idx}>
                                 <div className="flex items-center justify-between mb-2">
                                   <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center flex-shrink-0">
+                                    <div className="w-8 h-8 rounded-lg bg-linear-to-br from-blue-100 to-blue-50 flex items-center justify-center shrink-0">
                                       <span className="text-blue-700 font-bold text-xs">{String.fromCharCode(65 + idx)}</span>
                                     </div>
                                     <span className="font-medium text-gray-700">{option.text}</span>
@@ -178,7 +277,7 @@ const Polls = () => {
                                 </div>
                                 <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
                                   <div
-                                    className="bg-gradient-to-r from-blue-900 to-blue-600 rounded-full h-3 transition-all duration-700"
+                                    className="bg-linear-to-r from-blue-900 to-blue-600 rounded-full h-3 transition-all duration-700"
                                     style={{ width: `${percentage}%` }}
                                   />
                                 </div>

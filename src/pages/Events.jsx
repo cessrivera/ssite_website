@@ -4,6 +4,7 @@ import { getEvents } from '../services/eventService';
 import { registerForEvent, isUserRegistered } from '../services/eventRegistrationService';
 import { useAuth } from '../contexts/AuthContext';
 import Modal from '../components/common/Modal';
+import DOMPurify from 'dompurify';
 
 const Events = () => {
   const navigate = useNavigate();
@@ -344,9 +345,15 @@ const Events = () => {
               </div>
 
               <h3 className="font-bold text-gray-900 mb-3 text-lg">About This Event</h3>
-              <p className="text-gray-600 mb-8 leading-relaxed">
-                {selectedEvent.description || 'Event details coming soon. Stay tuned for more information about this exciting event!'}
-              </p>
+              {selectedEvent.description ? (
+                selectedEvent.description.includes('<') ? (
+                  <div className="prose max-w-none text-gray-600 mb-8 leading-relaxed" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedEvent.description) }} />
+                ) : (
+                  <p className="text-gray-600 mb-8 leading-relaxed">{selectedEvent.description}</p>
+                )
+              ) : (
+                <p className="text-gray-600 mb-8 leading-relaxed">Event details coming soon. Stay tuned for more information about this exciting event!</p>
+              )}
 
               <div className="flex flex-wrap gap-4">
                 <button 
@@ -415,7 +422,11 @@ const Events = () => {
                     )}
                   </div>
                   {event.description && (
-                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">{event.description}</p>
+                    event.description.includes('<') ? (
+                      <div className="text-gray-600 text-sm mb-3 line-clamp-2 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(event.description) }} />
+                    ) : (
+                      <p className="text-gray-600 text-sm mb-3 line-clamp-2">{event.description}</p>
+                    )
                   )}
                   <button
                     onClick={() => {

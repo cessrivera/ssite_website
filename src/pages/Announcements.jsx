@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getAnnouncements } from '../services/announcementService';
+import DOMPurify from 'dompurify';
 
 const Announcements = () => {
   const [announcements, setAnnouncements] = useState([]);
@@ -52,7 +53,7 @@ const Announcements = () => {
 
   return (
     <div className="py-12 bg-gray-50 min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-10">
           <h1 className="text-4xl font-bold text-gray-900 mb-3">Announcements</h1>
@@ -154,7 +155,11 @@ const Announcements = () => {
                     <h2 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-blue-900 transition-colors">{announcement.title}</h2>
                     
                     {announcement.content && (
-                      <p className="text-gray-600 mb-6 leading-relaxed line-clamp-4">{announcement.content}</p>
+                      announcement.content.includes('<') ? (
+                        <div className="text-gray-600 mb-6 leading-relaxed line-clamp-4 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(announcement.content) }} />
+                      ) : (
+                        <p className="text-gray-600 mb-6 leading-relaxed line-clamp-4">{announcement.content}</p>
+                      )
                     )}
                     
                     <button 
@@ -291,7 +296,11 @@ const Announcements = () => {
             {/* Modal Content */}
             <div className="p-6 md:p-8 overflow-y-auto grow">
               {selectedAnnouncement.content && (
-                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{selectedAnnouncement.content}</p>
+                selectedAnnouncement.content.includes('<') ? (
+                  <div className="prose max-w-none text-gray-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedAnnouncement.content) }} />
+                ) : (
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{selectedAnnouncement.content}</p>
+                )
               )}
             </div>
 
