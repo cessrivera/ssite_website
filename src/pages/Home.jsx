@@ -1,11 +1,9 @@
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import { getAnnouncements } from '../services/announcementService';
 import DOMPurify from 'dompurify';
 
 const Home = () => {
-  const { isAdmin } = useAuth();
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
@@ -17,7 +15,9 @@ const Home = () => {
   const loadAnnouncements = async () => {
     try {
       const data = await getAnnouncements();
-      setAnnouncements(data);
+      setAnnouncements(
+        data.filter((announcement) => announcement.archived !== true && announcement.status !== 'Draft')
+      );
     } catch (error) {
       console.error('Error loading announcements:', error);
     } finally {

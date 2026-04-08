@@ -6,19 +6,38 @@ import {
   doc, 
   getDocs, 
   getDoc,
-  query,
-  orderBy,
   Timestamp 
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 const COLLECTION = 'announcements';
 
+const toMillis = (value) => {
+  if (!value) return 0;
+  if (typeof value?.toDate === 'function') return value.toDate().getTime();
+  if (value instanceof Date) return value.getTime();
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const getAnnouncementSortTime = (announcement) => {
+  return (
+    toMillis(announcement.createdAt) ||
+    toMillis(announcement.updatedAt) ||
+    toMillis(announcement.date)
+  );
+};
+
 export const getAnnouncements = async () => {
   try {
-    const q = query(collection(db, COLLECTION), orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const snapshot = await getDocs(collection(db, COLLECTION));
+    return snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .sort((left, right) => {
+        const timeDelta = getAnnouncementSortTime(right) - getAnnouncementSortTime(left);
+        if (timeDelta !== 0) return timeDelta;
+        return String(left.title || '').localeCompare(String(right.title || ''));
+      });
   } catch (error) {
     console.error('Error getting announcements:', error);
     throw error;
