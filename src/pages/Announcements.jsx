@@ -8,6 +8,7 @@ const Announcements = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
+  const [brokenImages, setBrokenImages] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
@@ -120,12 +121,18 @@ const Announcements = () => {
             <>
               {paginatedAnnouncements.map((announcement) => (
                 <div key={announcement.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group cursor-pointer">
-                  {announcement.imageUrl ? (
+                  {announcement.imageUrl && !brokenImages[announcement.id] ? (
                     <div className="h-64 overflow-hidden">
                       <img 
                         src={announcement.imageUrl} 
                         alt={announcement.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={() =>
+                          setBrokenImages((prev) => ({
+                            ...prev,
+                            [announcement.id]: true
+                          }))
+                        }
                       />
                     </div>
                   ) : (
@@ -229,12 +236,18 @@ const Announcements = () => {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header with Image */}
-            {selectedAnnouncement.imageUrl ? (
+            {selectedAnnouncement.imageUrl && !brokenImages[selectedAnnouncement.id] ? (
               <div className="relative h-64 md:h-80 shrink-0">
                 <img 
                   src={selectedAnnouncement.imageUrl} 
                   alt={selectedAnnouncement.title}
                   className="w-full h-full object-cover"
+                  onError={() =>
+                    setBrokenImages((prev) => ({
+                      ...prev,
+                      [selectedAnnouncement.id]: true
+                    }))
+                  }
                 />
                 <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent"></div>
                 <button
