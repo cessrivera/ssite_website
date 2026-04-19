@@ -248,7 +248,7 @@ const Home = () => {
           onClick={() => setSelectedAnnouncement(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+            className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col min-w-0"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header with Image */}
@@ -319,15 +319,15 @@ const Home = () => {
             )}
 
             {/* Modal Content */}
-            <div className="p-6 md:p-8 overflow-y-auto grow">
+            <div className="p-6 md:p-8 overflow-y-auto overflow-x-hidden grow min-w-0">
               {selectedAnnouncement.content && (
                 selectedAnnouncement.content.includes('<') ? (
                   <div
-                    className="prose max-w-none text-gray-700 leading-relaxed"
+                    className="prose max-w-none text-gray-700 leading-relaxed wrap-anywhere **:max-w-full [&_img]:h-auto [&_pre]:whitespace-pre-wrap [&_pre]:wrap-anywhere"
                     dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedAnnouncement.content) }}
                   />
                 ) : (
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{selectedAnnouncement.content}</p>
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap wrap-anywhere">{selectedAnnouncement.content}</p>
                 )
               )}
             </div>
