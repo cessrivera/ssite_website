@@ -3,6 +3,11 @@ import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from '
 import { db } from '../../config/firebase';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 
+const PRIMARY_ADMIN_EMAIL = 'admin@ssite.com';
+const normalizeEmail = (email = '') => email.trim().toLowerCase();
+const isPrimaryAdminUser = (user = {}) =>
+  user.role === 'admin' && normalizeEmail(user.email) === PRIMARY_ADMIN_EMAIL;
+
 const AdminMembers = () => {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,8 +41,23 @@ const AdminMembers = () => {
 
       // Get users from users collection (including admins)
       const usersSnapshot = await getDocs(collection(db, 'users'));
-      const usersData = usersSnapshot.docs
-        .map(doc => ({ id: doc.id, source: 'users', ...doc.data() }))
+      const usersRaw = usersSnapshot.docs
+        .map(doc => ({ id: doc.id, source: 'users', ...doc.data() }));
+
+      const nonPrimaryAdmins = usersRaw.filter(user =>
+        user.role === 'admin' && !isPrimaryAdminUser(user)
+      );
+
+      if (nonPrimaryAdmins.length > 0) {
+        await Promise.all(nonPrimaryAdmins.map(user =>
+          updateDoc(doc(db, 'users', user.id), {
+            role: 'member',
+            updatedAt: new Date().toISOString()
+          })
+        ));
+      }
+
+      const usersData = usersRaw
         .map(user => ({
           id: user.id,
           source: 'users',
@@ -47,7 +67,7 @@ const AdminMembers = () => {
           course: user.course || 'N/A',
           year: user.year || 'N/A',
           status: user.status || 'active',
-          role: user.role || 'member',
+          role: isPrimaryAdminUser(user) ? 'admin' : 'member',
           createdAt: user.createdAt
         }));
 

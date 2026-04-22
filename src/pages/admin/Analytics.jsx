@@ -12,6 +12,11 @@ import { getMessages } from '../../services/messageService';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
+const PRIMARY_ADMIN_EMAIL = 'admin@ssite.com';
+const normalizeEmail = (email = '') => email.trim().toLowerCase();
+const isPrimaryAdminUser = (user = {}) =>
+  user.role === 'admin' && normalizeEmail(user.email) === PRIMARY_ADMIN_EMAIL;
+
 const COLORS = {
   blue: '#1d4ed8',
   lightBlue: '#3b82f6',
@@ -76,9 +81,9 @@ const Analytics = () => {
       const archivedEvents = events.filter(e => e.archived).length;
 
       // Members
-      const adminUsers = users.filter(u => u.role === 'admin');
-      const activeMembers = users.filter(u => u.role !== 'admin' && u.status === 'active').length;
-      const pendingMembers = users.filter(u => u.role !== 'admin' && u.status === 'pending').length;
+      const adminUsers = users.filter(isPrimaryAdminUser);
+      const activeMembers = users.filter(u => !isPrimaryAdminUser(u) && u.status === 'active').length;
+      const pendingMembers = users.filter(u => !isPrimaryAdminUser(u) && u.status === 'pending').length;
       const totalMembers = activeMembers + pendingMembers + members.length;
 
       // Polls

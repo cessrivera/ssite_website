@@ -9,6 +9,8 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 
 const AuthContext = createContext();
+const PRIMARY_ADMIN_EMAIL = 'admin@ssite.com';
+const normalizeEmail = (email = '') => email.trim().toLowerCase();
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -88,13 +90,20 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const fetchUserData = async (uid) => {
+  const fetchUserData = async (uid, authEmail = '') => {
     try {
       const userDoc = await getDoc(doc(db, 'users', uid));
       if (userDoc.exists()) {
         const data = userDoc.data();
         setUserData(data);
-        return data.role || 'member';
+        const role = data.role || 'member';
+        const email = normalizeEmail(data.email || authEmail);
+
+        if (role === 'admin' && email !== PRIMARY_ADMIN_EMAIL) {
+          return 'member';
+        }
+
+        return role;
       }
       setUserData(null);
       return 'member';
@@ -110,7 +119,7 @@ export const AuthProvider = ({ children }) => {
       setCurrentUser(user);
       
       if (user) {
-        const role = await fetchUserData(user.uid);
+        const role = await fetchUserData(user.uid, user.email || '');
         setUserRole(role);
       } else {
         setUserRole(null);

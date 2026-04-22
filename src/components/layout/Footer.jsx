@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom';
 
 const Footer = () => {
+  const websiteUrl = 'https://cit-website-pineda.vercel.app';
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=84x84&data=${encodeURIComponent(websiteUrl)}`;
+
   return (
     <footer className="bg-gradient-to-br from-blue-900 via-blue-900 to-blue-950 text-white">
       {/* Main Footer */}
@@ -34,22 +37,42 @@ const Footer = () => {
           {/* Connect */}
           <div>
             <h4 className="font-semibold mb-4 text-yellow-400">Connect With Us</h4>
-            <div className="flex items-center gap-3">
-              <a
-                href="https://www.facebook.com/UASSITE"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors"
-              >
-                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
-              </a>
+            <div className="mt-1 flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <a
+                    href="https://www.facebook.com/UASSITE"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors"
+                  >
+                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                  </a>
+                </div>
+                <p className="text-blue-200 text-sm leading-relaxed mt-4">
+                  University of the Assumption<br />
+                  College of Information Technology
+                </p>
+              </div>
+              <div className="shrink-0 flex flex-col items-center text-center">
+                <p className="text-xs text-blue-300 mb-2 whitespace-nowrap">Scan to visit our website</p>
+                <a
+                  href={websiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-fit rounded-lg overflow-hidden border border-blue-700/80 hover:border-blue-500 transition-colors"
+                >
+                  <img
+                    src={qrCodeUrl}
+                    alt="QR code for CIT website"
+                    className="w-16 h-16 bg-white"
+                    loading="lazy"
+                  />
+                </a>
+              </div>
             </div>
-            <p className="text-blue-200 text-sm mt-4">
-              University of the Assumption<br />
-              College of Information Technology
-            </p>
           </div>
         </div>
       </div>

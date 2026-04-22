@@ -5,14 +5,20 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 
+const PRIMARY_ADMIN_EMAIL = 'admin@ssite.com';
+
 export const createAdminUser = async (email, password) => {
   try {
+    if ((email || '').trim().toLowerCase() !== PRIMARY_ADMIN_EMAIL) {
+      return { success: false, error: 'Only admin@ssite.com can be created as admin.' };
+    }
+
     // Create user in Firebase Auth
-    const result = await createUserWithEmailAndPassword(auth, email, password);
+    const result = await createUserWithEmailAndPassword(auth, PRIMARY_ADMIN_EMAIL, password);
     
     // Create admin user document in Firestore
     await setDoc(doc(db, 'users', result.user.uid), {
-      email: email,
+      email: PRIMARY_ADMIN_EMAIL,
       role: 'admin',
       name: 'Admin User',
       createdAt: new Date().toISOString(),

@@ -154,7 +154,7 @@ const AdminLayout = () => {
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden">
                     <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
                       <p className="text-sm font-semibold text-gray-900">{userData?.fullName || 'Admin User'}</p>
-                      <p className="text-xs text-gray-500">{currentUser?.email || 'admin@ssite.edu'}</p>
+                      <p className="text-xs text-gray-500">{currentUser?.email || 'admin@ssite.com'}</p>
                     </div>
                     <div className="py-2">
                       <Link

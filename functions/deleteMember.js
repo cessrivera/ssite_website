@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const PRIMARY_ADMIN_EMAIL = 'admin@ssite.com';
 
 admin.initializeApp();
 
@@ -18,9 +19,11 @@ exports.deleteMember = functions.https.onCall(async (data, context) => {
   try {
     // Get user document to check if requester is admin
     const requesterDoc = await admin.firestore().collection('users').doc(context.auth.uid).get();
+    const requesterData = requesterDoc.data() || {};
+    const requesterEmail = (requesterData.email || '').toLowerCase();
     
-    if (!requesterDoc.exists || requesterDoc.data().role !== 'admin') {
-      throw new functions.https.HttpsError('permission-denied', 'Only admins can delete members');
+    if (!requesterDoc.exists || requesterData.role !== 'admin' || requesterEmail !== PRIMARY_ADMIN_EMAIL) {
+      throw new functions.https.HttpsError('permission-denied', 'Only admin@ssite.com can delete members');
     }
 
     // Delete user from Firebase Authentication

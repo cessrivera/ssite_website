@@ -131,6 +131,13 @@ const AdminEvents = () => {
     setShowForm(false);
   };
 
+  const getDescriptionPreview = (description = '') =>
+    description
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -295,9 +302,9 @@ const AdminEvents = () => {
       ) : (
         <div className="space-y-4">
           {events.filter(e => showArchived ? e.archived : !e.archived).map((event) => (
-            <div key={event.id} className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
-              <div className="flex justify-between items-start">
-                <div className="flex-grow">
+            <div key={event.id} className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow overflow-hidden">
+              <div className="flex justify-between items-start gap-4">
+                <div className="flex-grow min-w-0">
                   <h3 className="text-xl font-bold text-gray-900 mb-3">{event.title}</h3>
                   <div className="flex flex-wrap items-center gap-4 text-gray-600 mb-3">
                     <span className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-lg text-sm">
@@ -324,7 +331,9 @@ const AdminEvents = () => {
                     )}
                   </div>
                   {event.description && (
-                    <p className="text-gray-600">{event.description}</p>
+                    <p className="text-gray-600 break-words whitespace-normal">
+                      {getDescriptionPreview(event.description)}
+                    </p>
                   )}
                 </div>
                 <div className="flex gap-2 ml-4">

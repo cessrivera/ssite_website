@@ -240,7 +240,7 @@ const AdminSettings = () => {
             <div>
               <label className="block text-sm font-semibold text-gray-500 mb-1">Email</label>
               <div className="border-2 border-gray-200 rounded-xl px-4 py-3 bg-gray-50 text-gray-700">
-                {currentUser?.email || 'admin@ssite.edu'}
+                {currentUser?.email || 'admin@ssite.com'}
               </div>
             </div>
 

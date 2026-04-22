@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { createAdminUser } from '../config/setupAdmin';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, setDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../config/firebase';
+
+const PRIMARY_ADMIN_EMAIL = 'admin@ssite.com';
+const normalizeEmail = (email = '') => email.trim().toLowerCase();
 
 const Login = ({ defaultAdminLogin = false }) => {
   const navigate = useNavigate();
@@ -12,7 +14,7 @@ const Login = ({ defaultAdminLogin = false }) => {
     email: '',
     password: '',
   });
-  const [isAdminLogin, setIsAdminLogin] = useState(defaultAdminLogin);
+  const isAdminLogin = defaultAdminLogin;
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -26,6 +28,12 @@ const Login = ({ defaultAdminLogin = false }) => {
     setError('');
     setLoading(true);
 
+    if (isAdminLogin && normalizeEmail(formData.email) !== PRIMARY_ADMIN_EMAIL) {
+      setError('Only admin@ssite.com is allowed for admin access.');
+      setLoading(false);
+      return;
+    }
+
     const result = await login(formData.email, formData.password);
     
     if (result.success) {
@@ -34,22 +42,45 @@ const Login = ({ defaultAdminLogin = false }) => {
         try {
           const userRef = doc(db, 'users', result.user.uid);
           const userDoc = await getDoc(userRef);
+          const adminData = {
+            email: PRIMARY_ADMIN_EMAIL,
+            role: 'admin',
+            name: 'Admin User',
+            status: 'active',
+            updatedAt: new Date().toISOString()
+          };
           
           // If no user document exists, create it with admin role
           if (!userDoc.exists()) {
             await setDoc(userRef, {
-              email: formData.email,
-              role: 'admin',
-              name: 'Admin User',
-              createdAt: new Date().toISOString(),
-              status: 'active'
+              ...adminData,
+              createdAt: new Date().toISOString()
             });
             console.log('Admin document created in Firestore');
-          } else if (userDoc.data().role !== 'admin') {
-            // User exists but is not admin
-            setError('This account does not have admin privileges.');
-            setLoading(false);
-            return;
+          } else {
+            await setDoc(userRef, adminData, { merge: true });
+          }
+
+          // Demote any other admin accounts to member.
+          const adminsQuery = query(collection(db, 'users'), where('role', '==', 'admin'));
+          const adminsSnapshot = await getDocs(adminsQuery);
+          const batch = writeBatch(db);
+          let hasDemotions = false;
+
+          adminsSnapshot.forEach((adminDoc) => {
+            const data = adminDoc.data();
+            const email = normalizeEmail(data.email);
+            if (email !== PRIMARY_ADMIN_EMAIL) {
+              batch.update(adminDoc.ref, {
+                role: 'member',
+                updatedAt: new Date().toISOString()
+              });
+              hasDemotions = true;
+            }
+          });
+
+          if (hasDemotions) {
+            await batch.commit();
           }
           
           // Redirect to admin dashboard
@@ -112,7 +143,7 @@ const Login = ({ defaultAdminLogin = false }) => {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  placeholder="admin@ssite.edu"
+                  placeholder="admin@ssite.com"
                   required
                   className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
