@@ -2,10 +2,12 @@ import { Link } from 'react-router-dom';
 
 const Footer = () => {
   const websiteUrl = 'https://cit-website-pineda.vercel.app';
+  const researchUrl = 'https://research-archived-gray.vercel.app/';
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=84x84&data=${encodeURIComponent(websiteUrl)}`;
+  const researchQrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=84x84&data=${encodeURIComponent(researchUrl)}`;
 
   return (
-    <footer className="bg-gradient-to-br from-blue-900 via-blue-900 to-blue-950 text-white">
+    <footer className="bg-linear-to-br from-blue-900 via-blue-900 to-blue-950 text-white">
       {/* Main Footer */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid md:grid-cols-3 gap-8 mb-8">
@@ -57,20 +59,41 @@ const Footer = () => {
                 </p>
               </div>
               <div className="shrink-0 flex flex-col items-center text-center">
-                <p className="text-xs text-blue-300 mb-2 whitespace-nowrap">Scan to visit our website</p>
-                <a
-                  href={websiteUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-fit rounded-lg overflow-hidden border border-blue-700/80 hover:border-blue-500 transition-colors"
-                >
-                  <img
-                    src={qrCodeUrl}
-                    alt="QR code for CIT website"
-                    className="w-16 h-16 bg-white"
-                    loading="lazy"
-                  />
-                </a>
+                <p className="text-xs text-blue-300 mb-2 whitespace-nowrap">Scan to visit our pages</p>
+                <div className="flex items-start gap-3">
+                  <div className="flex flex-col items-center">
+                    <a
+                      href={websiteUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-fit rounded-lg overflow-hidden border border-blue-700/80 hover:border-blue-500 transition-colors"
+                    >
+                      <img
+                        src={qrCodeUrl}
+                        alt="QR code for CIT website"
+                        className="w-16 h-16 bg-white"
+                        loading="lazy"
+                      />
+                    </a>
+                    <span className="mt-1 text-[10px] text-blue-300">Website</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <a
+                      href={researchUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-fit rounded-lg overflow-hidden border border-blue-700/80 hover:border-blue-500 transition-colors"
+                    >
+                      <img
+                        src={researchQrCodeUrl}
+                        alt="QR code for research archive"
+                        className="w-16 h-16 bg-white"
+                        loading="lazy"
+                      />
+                    </a>
+                    <span className="mt-1 text-[10px] text-blue-300">Research</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
