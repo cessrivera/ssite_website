@@ -1,8 +1,28 @@
 // Cloudinary image upload service
 // Uses unsigned upload with an upload preset (no API secret needed on client)
 
-const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+const DEFAULT_CLOUD_NAME = 'dphrxngbc';
+const DEFAULT_UPLOAD_PRESET = 'site_uploads';
+
+const pickEnv = (...keys) => {
+  for (const key of keys) {
+    const value = import.meta.env?.[key];
+    if (typeof value === 'string') {
+      const normalized = value.trim();
+      if (normalized && !normalized.startsWith('your_')) {
+        return normalized;
+      }
+    }
+  }
+  return '';
+};
+
+const CLOUD_NAME =
+  pickEnv('VITE_CLOUDINARY_CLOUD_NAME', 'VITE_APP_CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_CLOUD_NAME') ||
+  DEFAULT_CLOUD_NAME;
+const UPLOAD_PRESET =
+  pickEnv('VITE_CLOUDINARY_UPLOAD_PRESET', 'VITE_APP_CLOUDINARY_UPLOAD_PRESET', 'CLOUDINARY_UPLOAD_PRESET') ||
+  DEFAULT_UPLOAD_PRESET;
 const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
 
 /**
@@ -13,14 +33,6 @@ const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
  */
 export const uploadImage = async (file, folder = 'ssite') => {
   try {
-    if (!CLOUD_NAME || CLOUD_NAME === 'your_cloud_name_here') {
-      throw new Error('Cloudinary cloud name not configured. Check your .env file.');
-    }
-
-    if (!UPLOAD_PRESET || UPLOAD_PRESET === 'your_upload_preset_here') {
-      throw new Error('Cloudinary upload preset not configured. Check your .env file.');
-    }
-
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', UPLOAD_PRESET);
