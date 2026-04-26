@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { collection, doc, getDoc, getDocs, query, setDoc, where, writeBatch } from 'firebase/firestore';
@@ -102,11 +102,11 @@ const Login = ({ defaultAdminLogin = false }) => {
 
 
 
-  // If already logged in as admin, redirect
-  if (currentUser && isAdmin) {
-    navigate('/admin');
-    return null;
-  }
+  useEffect(() => {
+    if (currentUser && isAdmin) {
+      navigate('/admin', { replace: true });
+    }
+  }, [currentUser, isAdmin, navigate]);
 
   return (
     <div className="py-12 bg-gray-50 min-h-screen flex items-center">

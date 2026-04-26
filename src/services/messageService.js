@@ -9,6 +9,7 @@ import {
   updateDoc,
   orderBy, 
   query,
+  where,
   serverTimestamp 
 } from 'firebase/firestore';
 import { createUserNotification } from './userNotificationService';
@@ -110,7 +111,7 @@ export const replyToMessage = async (messageId, replyData, originalMessage) => {
         }
       }
 
-      await createUserNotification({
+      const notificationResult = await createUserNotification({
         userEmail: recipientEmail || originalMessage.email || '',
         userId: recipientUserId || null,
         userName: originalMessage.name,
@@ -120,6 +121,10 @@ export const replyToMessage = async (messageId, replyData, originalMessage) => {
         messageId,
         repliedBy: replyData.adminEmail || 'Admin'
       });
+
+      if (!notificationResult.success) {
+        console.error('Reply saved but notification creation failed:', notificationResult.error);
+      }
     }
 
     return { success: true };

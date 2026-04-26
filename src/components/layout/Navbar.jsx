@@ -56,6 +56,9 @@ const Navbar = () => {
   }, [isAuthenticated, isAdmin, userData?.email, currentUser?.email, currentUser?.uid]);
 
   const handleMarkAsRead = async (notificationId) => {
+    if (notificationId.startsWith('message-')) {
+      return;
+    }
     await markNotificationAsRead(notificationId);
     setNotifications(notifications.map(n => 
       n.id === notificationId ? { ...n, read: true } : n

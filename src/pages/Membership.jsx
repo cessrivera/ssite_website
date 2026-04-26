@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { createMember } from '../services/memberService';
 
 const Membership = () => {
   const navigate = useNavigate();
@@ -50,17 +49,6 @@ const Membership = () => {
       });
 
       if (result.success) {
-        // Create member record in members collection
-        await createMember({
-          userId: result.user.uid,
-          studentId: formData.studentNumber,
-          name: formData.fullName,
-          year: formData.yearLevel,
-          course: 'BSIT',
-          email: formData.email,
-          status: 'pending'
-        });
-
         navigate('/');
       } else {
         setError(result.error || 'Registration failed. Please try again.');

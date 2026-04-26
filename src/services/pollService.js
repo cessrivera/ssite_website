@@ -87,6 +87,7 @@ export const updatePoll = async (id, data) => {
 };
 
 export const votePoll = async (pollId, optionIndex, userId) => {
+  const voteRef = doc(db, 'pollVotes', `${pollId}_${userId}`);
   try {
     const pollRef = doc(db, COLLECTION, pollId);
     const pollDoc = await getDoc(pollRef);
@@ -100,7 +101,6 @@ export const votePoll = async (pollId, optionIndex, userId) => {
     if (!userId) throw new Error('You must be logged in to vote.');
     if (!options[optionIndex]) throw new Error('Invalid poll option.');
 
-    const voteRef = doc(db, 'pollVotes', `${pollId}_${userId}`);
     const existingVote = await getDoc(voteRef);
     if (existingVote.exists()) {
       throw new Error('You have already voted in this poll.');
@@ -113,6 +113,18 @@ export const votePoll = async (pollId, optionIndex, userId) => {
       votedAt: Timestamp.now(),
     });
   } catch (error) {
+    if (error?.code === 'permission-denied') {
+      try {
+        const existingVote = await getDoc(voteRef);
+        if (existingVote.exists()) {
+          throw new Error('You have already voted in this poll.');
+        }
+      } catch (lookupError) {
+        if (lookupError?.message === 'You have already voted in this poll.') {
+          throw lookupError;
+        }
+      }
+    }
     console.error('Error voting on poll:', error);
     throw error;
   }

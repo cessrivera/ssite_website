@@ -80,6 +80,20 @@ export const AuthProvider = ({ children }) => {
         createdAt: new Date().toISOString(),
         status: 'pending'
       });
+
+      await setDoc(doc(db, 'members', result.user.uid), {
+        userId: result.user.uid,
+        studentId: userData.studentId || '',
+        name: userData.name || '',
+        year: userData.year || '',
+        course: userData.course || 'BSIT',
+        email: email,
+        role: 'member',
+        status: 'pending',
+        archived: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
       
       // Sign out immediately — pending users must not access the app
       await signOut(auth);

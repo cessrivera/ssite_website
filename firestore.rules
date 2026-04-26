@@ -47,18 +47,41 @@ service cloud.firestore {
     
     match /pollVotes/{document=**} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.userId is string
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.pollId is string
+                    && request.resource.data.optionIndex is int;
       allow update, delete: if isPrimaryAdmin();
     }
     
     match /members/{document=**} {
       allow read: if isPrimaryAdmin();
-      allow write: if isPrimaryAdmin();
-      allow delete: if isPrimaryAdmin();
+      allow create: if isPrimaryAdmin()
+                    || (isSignedIn()
+                        && request.resource.data.userId is string
+                        && request.resource.data.userId == request.auth.uid
+                        && request.resource.data.status == 'pending');
+      allow update, delete: if isPrimaryAdmin();
     }
     
     match /messages/{document=**} {
-      allow read: if isPrimaryAdmin();
+      allow read: if isPrimaryAdmin()
+                  || (isSignedIn()
+                      && (
+                        (resource.data.senderUid is string && resource.data.senderUid == request.auth.uid)
+                        || (resource.data.emailNormalized is string
+                            && request.auth.token.email is string
+                            && resource.data.emailNormalized == request.auth.token.email.lower())
+                        || (resource.data.email is string
+                            && request.auth.token.email is string
+                            && (resource.data.email == request.auth.token.email
+                                || resource.data.email == request.auth.token.email.lower()))
+                        || (resource.data.senderAuthEmail is string
+                            && request.auth.token.email is string
+                            && (resource.data.senderAuthEmail == request.auth.token.email
+                                || resource.data.senderAuthEmail == request.auth.token.email.lower()))
+                       ));
       allow create: if isSignedIn();
       allow update, delete: if isPrimaryAdmin();
     }
@@ -88,7 +111,11 @@ service cloud.firestore {
                         (resource.data.userId is string && resource.data.userId == request.auth.uid)
                         || (resource.data.userEmail is string
                             && request.auth.token.email is string
-                            && resource.data.userEmail == request.auth.token.email.lower())
+                            && (resource.data.userEmail == request.auth.token.email
+                                || resource.data.userEmail == request.auth.token.email.lower()))
+                        || (resource.data.userEmailNormalized is string
+                            && request.auth.token.email is string
+                            && resource.data.userEmailNormalized == request.auth.token.email.lower())
                       ));
       allow create: if isPrimaryAdmin();
       allow update: if isPrimaryAdmin()
@@ -97,7 +124,11 @@ service cloud.firestore {
                           (resource.data.userId is string && resource.data.userId == request.auth.uid)
                           || (resource.data.userEmail is string
                               && request.auth.token.email is string
-                              && resource.data.userEmail == request.auth.token.email.lower())
+                              && (resource.data.userEmail == request.auth.token.email
+                                  || resource.data.userEmail == request.auth.token.email.lower()))
+                          || (resource.data.userEmailNormalized is string
+                              && request.auth.token.email is string
+                              && resource.data.userEmailNormalized == request.auth.token.email.lower())
                         ));
       allow delete: if isPrimaryAdmin();
     }

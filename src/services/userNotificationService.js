@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 
 const notificationsCollection = collection(db, 'userNotifications');
+const messagesCollection = collection(db, 'messages');
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
 
 const normalizeRecipient = (recipient) => {
@@ -35,13 +36,26 @@ const normalizeRecipient = (recipient) => {
 
 const buildRecipientQueries = (recipient) => {
   const clauses = [];
-  if (recipient.userId) clauses.push(query(notificationsCollection, where('userId', '==', recipient.userId)));
-  if (recipient.userEmail) clauses.push(query(notificationsCollection, where('userEmail', '==', recipient.userEmail)));
-  if (recipient.userEmailNormalized && recipient.userEmailNormalized !== recipient.userEmail) {
-    clauses.push(query(notificationsCollection, where('userEmail', '==', recipient.userEmailNormalized)));
+  if (recipient.userId) {
+    clauses.push(query(notificationsCollection, where('userId', '==', recipient.userId)));
   }
   if (recipient.userEmailNormalized) {
     clauses.push(query(notificationsCollection, where('userEmailNormalized', '==', recipient.userEmailNormalized)));
+  }
+  if (!recipient.userId && !recipient.userEmailNormalized && recipient.userEmail) {
+    clauses.push(query(notificationsCollection, where('userEmail', '==', recipient.userEmail)));
+  }
+  return clauses;
+};
+
+const buildMessageRecipientQueries = (recipient) => {
+  const clauses = [];
+  if (recipient.userId) clauses.push(query(messagesCollection, where('senderUid', '==', recipient.userId)));
+  if (recipient.userEmailNormalized) {
+    clauses.push(query(messagesCollection, where('emailNormalized', '==', recipient.userEmailNormalized)));
+  }
+  if (!recipient.userId && !recipient.userEmailNormalized && recipient.userEmail) {
+    clauses.push(query(messagesCollection, where('email', '==', recipient.userEmail)));
   }
   return clauses;
 };
@@ -57,9 +71,27 @@ const mergeNotifications = (items = []) => {
   const byId = new Map();
   items.forEach((item) => {
     if (!item?.id) return;
-    byId.set(item.id, item);
+    const dedupeKey = item.messageId ? `message-${item.messageId}` : item.id;
+    byId.set(dedupeKey, item);
   });
   return sortByNewest([...byId.values()]);
+};
+
+const mapReplyMessageToNotification = (messageDoc) => {
+  const data = messageDoc.data();
+  if (data?.status !== 'replied' || !data?.reply) return null;
+
+  return {
+    id: `message-${messageDoc.id}`,
+    source: 'message',
+    messageId: messageDoc.id,
+    subject: 'Reply to your message',
+    message: data.reply,
+    originalMessage: data.message,
+    repliedBy: data.repliedBy || 'Admin',
+    createdAt: data.repliedAt || data.createdAt,
+    read: true
+  };
 };
 
 // Create a notification for user when admin replies
@@ -125,8 +157,8 @@ export const subscribeToUserNotifications = (recipientValue, callback) => {
 
   const queryKeys = [];
   const queryResults = {};
-  const unsubscribers = buildRecipientQueries(recipient).map((recipientQuery, idx) => {
-    const key = `query-${idx}`;
+  const notificationUnsubscribers = buildRecipientQueries(recipient).map((recipientQuery, idx) => {
+    const key = `notifications-${idx}`;
     queryKeys.push(key);
     queryResults[key] = [];
 
@@ -147,8 +179,29 @@ export const subscribeToUserNotifications = (recipientValue, callback) => {
     );
   });
 
+  const messageUnsubscribers = buildMessageRecipientQueries(recipient).map((recipientQuery, idx) => {
+    const key = `messages-${idx}`;
+    queryKeys.push(key);
+    queryResults[key] = [];
+
+    return onSnapshot(
+      recipientQuery,
+      (snapshot) => {
+        queryResults[key] = snapshot.docs
+          .map((messageDoc) => mapReplyMessageToNotification(messageDoc))
+          .filter(Boolean);
+        callback(mergeNotifications(queryKeys.flatMap((queryKey) => queryResults[queryKey] || [])));
+      },
+      (error) => {
+        console.error('Error subscribing to replied messages:', error);
+        queryResults[key] = [];
+        callback(mergeNotifications(queryKeys.flatMap((queryKey) => queryResults[queryKey] || [])));
+      }
+    );
+  });
+
   return () => {
-    unsubscribers.forEach((unsubscribe) => unsubscribe());
+    [...notificationUnsubscribers, ...messageUnsubscribers].forEach((unsubscribe) => unsubscribe());
   };
 };
 
