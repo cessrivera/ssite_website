@@ -4,6 +4,8 @@ import {
   updateDoc, 
   deleteDoc, 
   doc, 
+  getDoc,
+  setDoc,
   getDocs, 
   query,
   orderBy,
@@ -17,7 +19,39 @@ export const getPolls = async () => {
   try {
     const q = query(collection(db, COLLECTION), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const polls = snapshot.docs.map((pollDoc) => ({ id: pollDoc.id, ...pollDoc.data() }));
+
+    try {
+      const votesSnapshot = await getDocs(collection(db, 'pollVotes'));
+      const votesByPoll = new Map();
+
+      votesSnapshot.docs.forEach((voteDoc) => {
+        const voteData = voteDoc.data();
+        if (!voteData?.pollId) return;
+
+        const pollVotes = votesByPoll.get(voteData.pollId) || [];
+        pollVotes.push(voteData);
+        votesByPoll.set(voteData.pollId, pollVotes);
+      });
+
+      return polls.map((poll) => {
+        const pollVotes = votesByPoll.get(poll.id) || [];
+        const options = (poll.options || []).map((option, idx) => ({
+          ...option,
+          votes: pollVotes.filter((vote) => vote.optionIndex === idx).length,
+        }));
+        const votedUsers = [...new Set(pollVotes.map((vote) => vote.userId).filter(Boolean))];
+
+        return {
+          ...poll,
+          options,
+          totalVotes: pollVotes.length,
+          votedUsers,
+        };
+      });
+    } catch {
+      return polls;
+    }
   } catch (error) {
     console.error('Error getting polls:', error);
     throw error;
@@ -55,32 +89,28 @@ export const updatePoll = async (id, data) => {
 export const votePoll = async (pollId, optionIndex, userId) => {
   try {
     const pollRef = doc(db, COLLECTION, pollId);
-    const pollsQuery = query(collection(db, COLLECTION));
-    const pollSnapshot = await getDocs(pollsQuery);
-    const pollDoc = pollSnapshot.docs.find(d => d.id === pollId);
-    
-    if (!pollDoc) {
+    const pollDoc = await getDoc(pollRef);
+    if (!pollDoc.exists()) {
       throw new Error('Poll not found');
     }
 
     const pollData = pollDoc.data();
     const options = pollData.options || [];
-    const votedUsers = pollData.votedUsers || [];
-    
-    // Increment the vote count for the selected option
-    options[optionIndex].votes = (options[optionIndex].votes || 0) + 1;
-    
-    // Add user to votedUsers array
-    votedUsers.push(userId);
-    
-    // Update total votes
-    const totalVotes = (pollData.totalVotes || 0) + 1;
-    
-    await updateDoc(pollRef, {
-      options,
-      votedUsers,
-      totalVotes,
-      updatedAt: Timestamp.now()
+    if (!pollData.active) throw new Error('This poll is closed.');
+    if (!userId) throw new Error('You must be logged in to vote.');
+    if (!options[optionIndex]) throw new Error('Invalid poll option.');
+
+    const voteRef = doc(db, 'pollVotes', `${pollId}_${userId}`);
+    const existingVote = await getDoc(voteRef);
+    if (existingVote.exists()) {
+      throw new Error('You have already voted in this poll.');
+    }
+
+    await setDoc(voteRef, {
+      pollId,
+      userId,
+      optionIndex,
+      votedAt: Timestamp.now(),
     });
   } catch (error) {
     console.error('Error voting on poll:', error);

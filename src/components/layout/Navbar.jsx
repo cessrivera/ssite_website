@@ -44,7 +44,10 @@ const Navbar = () => {
       return () => {};
     }
 
-    const unsubscribe = subscribeToUserNotifications(email, (data) => {
+    const unsubscribe = subscribeToUserNotifications({
+      userId: currentUser?.uid || '',
+      email
+    }, (data) => {
       setNotifications(data);
       setUnreadCount(data.filter((item) => !item.read).length);
     });
@@ -61,8 +64,11 @@ const Navbar = () => {
   };
 
   const handleMarkAllAsRead = async () => {
-    if (userData?.email) {
-      await markAllAsRead(userData.email);
+    if (currentUser?.uid || userData?.email || currentUser?.email) {
+      await markAllAsRead({
+        userId: currentUser?.uid || '',
+        email: userData?.email || currentUser?.email || ''
+      });
       setNotifications(notifications.map(n => ({ ...n, read: true })));
       setUnreadCount(0);
     }

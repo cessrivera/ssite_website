@@ -92,6 +92,68 @@ const Events = () => {
   };
 
   const upcomingEvents = events;
+  const toCalendarDate = (value) => {
+    const date = value?.toDate ? value.toDate() : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const formatCalendarDay = (date) => [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, '0'),
+    String(date.getUTCDate()).padStart(2, '0'),
+  ].join('');
+
+  const escapeIcsText = (value = '') =>
+    value
+      .replace(/\\/g, '\\\\')
+      .replace(/\r?\n/g, '\\n')
+      .replace(/,/g, '\\,')
+      .replace(/;/g, '\\;');
+
+  const handleAddToCalendar = () => {
+    if (!selectedEvent?.date) return;
+
+    const eventDate = toCalendarDate(selectedEvent.date);
+    if (!eventDate) return;
+
+    const startUtc = new Date(Date.UTC(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate()));
+    const endUtc = new Date(startUtc);
+    endUtc.setUTCDate(endUtc.getUTCDate() + 1);
+
+    const details = [
+      selectedEvent.description ? selectedEvent.description.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '',
+      selectedEvent.time ? `Time: ${selectedEvent.time}` : '',
+    ].filter(Boolean).join('\n');
+
+    const nowStamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+    const uid = `${selectedEvent.id || formatCalendarDay(startUtc)}@ssite-events`;
+    const icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//SSITE//Events//EN',
+      'CALSCALE:GREGORIAN',
+      'BEGIN:VEVENT',
+      `UID:${uid}`,
+      `DTSTAMP:${nowStamp}`,
+      `DTSTART;VALUE=DATE:${formatCalendarDay(startUtc)}`,
+      `DTEND;VALUE=DATE:${formatCalendarDay(endUtc)}`,
+      `SUMMARY:${escapeIcsText(selectedEvent.title || 'SSITE Event')}`,
+      `DESCRIPTION:${escapeIcsText(details)}`,
+      `LOCATION:${escapeIcsText(selectedEvent.venue || '')}`,
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const downloadUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = downloadUrl;
+    anchor.download = `${(selectedEvent.title || 'event').replace(/[^\w-]+/g, '_').toLowerCase()}.ics`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(downloadUrl);
+  };
 
   // Calendar helper
   const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
@@ -277,7 +339,7 @@ const Events = () => {
 
         {/* Event Details */}
         {selectedEvent && (
-          <div className="mt-10 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="mt-10 bg-white rounded-2xl shadow-sm border border-gray-100">
             {/* Event Image */}
             <div className="h-72 relative overflow-hidden">
               {selectedEvent.imageUrl ? (
@@ -347,9 +409,12 @@ const Events = () => {
               <h3 className="font-bold text-gray-900 mb-3 text-lg">About This Event</h3>
               {selectedEvent.description ? (
                 selectedEvent.description.includes('<') ? (
-                  <div className="prose max-w-none text-gray-600 mb-8 leading-relaxed" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedEvent.description) }} />
+                  <div
+                    className="prose max-w-none text-gray-600 mb-8 leading-relaxed break-words [&_p]:whitespace-normal [&_p]:break-words [&_li]:whitespace-normal [&_li]:break-words"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedEvent.description, { FORBID_ATTR: ['style'] }) }}
+                  />
                 ) : (
-                  <p className="text-gray-600 mb-8 leading-relaxed">{selectedEvent.description}</p>
+                  <p className="text-gray-600 mb-8 leading-relaxed whitespace-normal wrap-anywhere">{selectedEvent.description}</p>
                 )
               ) : (
                 <p className="text-gray-600 mb-8 leading-relaxed">Event details coming soon. Stay tuned for more information about this exciting event!</p>
@@ -374,7 +439,12 @@ const Events = () => {
                   </svg>
                   {isAlreadyRegistered ? 'Already Registered' : 'Register for Event'}
                 </button>
-                <button className="border-2 border-gray-200 px-8 py-3 rounded-xl font-semibold hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700">
+                <button
+                  type="button"
+                  onClick={handleAddToCalendar}
+                  disabled={!selectedEvent?.date}
+                  className="border-2 border-gray-200 px-8 py-3 rounded-xl font-semibold hover:bg-gray-50 transition-colors flex items-center gap-2 text-gray-700 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -429,9 +499,9 @@ const Events = () => {
                   </div>
                   {event.description && (
                     event.description.includes('<') ? (
-                      <div className="text-gray-600 text-sm mb-3 line-clamp-2 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(event.description) }} />
+                      <div className="text-gray-600 text-sm mb-3 prose prose-sm max-w-none break-words [&_p]:whitespace-normal [&_p]:break-words [&_li]:whitespace-normal [&_li]:break-words" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(event.description) }} />
                     ) : (
-                      <p className="text-gray-600 text-sm mb-3 line-clamp-2">{event.description}</p>
+                      <p className="text-gray-600 text-sm mb-3 break-words whitespace-normal">{event.description}</p>
                     )
                   )}
                   <button

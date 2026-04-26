@@ -82,9 +82,23 @@ service cloud.firestore {
     }
 
     match /userNotifications/{notificationId} {
-      allow read: if isPrimaryAdmin() || (isSignedIn() && resource.data.userEmail == request.auth.token.email);
+      allow read: if isPrimaryAdmin()
+                  || (isSignedIn()
+                      && (
+                        (resource.data.userId is string && resource.data.userId == request.auth.uid)
+                        || (resource.data.userEmail is string
+                            && request.auth.token.email is string
+                            && resource.data.userEmail == request.auth.token.email.lower())
+                      ));
       allow create: if isPrimaryAdmin();
-      allow update: if isPrimaryAdmin() || (isSignedIn() && resource.data.userEmail == request.auth.token.email);
+      allow update: if isPrimaryAdmin()
+                    || (isSignedIn()
+                        && (
+                          (resource.data.userId is string && resource.data.userId == request.auth.uid)
+                          || (resource.data.userEmail is string
+                              && request.auth.token.email is string
+                              && resource.data.userEmail == request.auth.token.email.lower())
+                        ));
       allow delete: if isPrimaryAdmin();
     }
 

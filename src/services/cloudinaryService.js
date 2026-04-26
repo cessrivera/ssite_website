@@ -18,10 +18,20 @@ const pickEnv = (...keys) => {
 };
 
 const CLOUD_NAME =
-  pickEnv('VITE_CLOUDINARY_CLOUD_NAME', 'VITE_APP_CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_CLOUD_NAME') ||
+  pickEnv(
+    'VITE_CLOUDINARY_CLOUD_NAME',
+    'VITE_APP_CLOUDINARY_CLOUD_NAME',
+    'REACT_APP_CLOUDINARY_CLOUD_NAME',
+    'CLOUDINARY_CLOUD_NAME'
+  ) ||
   DEFAULT_CLOUD_NAME;
 const UPLOAD_PRESET =
-  pickEnv('VITE_CLOUDINARY_UPLOAD_PRESET', 'VITE_APP_CLOUDINARY_UPLOAD_PRESET', 'CLOUDINARY_UPLOAD_PRESET') ||
+  pickEnv(
+    'VITE_CLOUDINARY_UPLOAD_PRESET',
+    'VITE_APP_CLOUDINARY_UPLOAD_PRESET',
+    'REACT_APP_CLOUDINARY_UPLOAD_PRESET',
+    'CLOUDINARY_UPLOAD_PRESET'
+  ) ||
   DEFAULT_UPLOAD_PRESET;
 const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
 
@@ -32,41 +42,66 @@ const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
  * @returns {Promise<{success: boolean, url?: string, error?: string}>}
  */
 export const uploadImage = async (file, folder = 'ssite') => {
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', UPLOAD_PRESET);
-    formData.append('folder', folder);
-
-    const response = await fetch(UPLOAD_URL, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      let errorMessage = 'Upload failed';
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.error?.message || errorMessage;
-      } catch {
-        errorMessage = `Upload failed with status ${response.status}`;
-      }
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
-    return {
-      success: true,
-      url: data.secure_url,
-      publicId: data.public_id,
-    };
-  } catch (error) {
-    console.error('Cloudinary upload error:', error);
-    return {
-      success: false,
-      error: error.message || 'Upload failed. Please try again.',
-    };
+  if (!(file instanceof File)) {
+    return { success: false, error: 'Please select a valid image file.' };
   }
+
+  const presetCandidates = [...new Set([UPLOAD_PRESET, DEFAULT_UPLOAD_PRESET])].filter(Boolean);
+  const folderModes = folder ? [true, false] : [false];
+  let latestError = 'Upload failed. Please try again.';
+
+  try {
+    for (const preset of presetCandidates) {
+      for (const withFolder of folderModes) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', preset);
+        if (withFolder) {
+          formData.append('folder', folder);
+        }
+
+        const response = await fetch(UPLOAD_URL, {
+          method: 'POST',
+          body: formData,
+        });
+
+        let payload = null;
+        try {
+          payload = await response.json();
+        } catch {
+          payload = null;
+        }
+
+        if (response.ok && payload?.secure_url) {
+          return {
+            success: true,
+            url: payload.secure_url,
+            publicId: payload.public_id,
+          };
+        }
+
+        const errorMessage = payload?.error?.message || `Upload failed with status ${response.status}`;
+        latestError = errorMessage;
+
+        if (!withFolder) {
+          break;
+        }
+
+        const folderRejected = /folder|invalid parameter|not allowed/i.test(errorMessage);
+        if (!folderRejected) {
+          break;
+        }
+      }
+    }
+  } catch (error) {
+    latestError = error.message || latestError;
+    console.error('Cloudinary upload error:', error);
+  }
+
+  return {
+    success: false,
+    error: latestError,
+  };
 };
 
 /**

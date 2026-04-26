@@ -1,18 +1,37 @@
 import { db } from '../config/firebase';
-import { 
-  collection, 
-  addDoc, 
-  getDocs, 
+import {
+  collection,
+  addDoc,
+  getDocs,
   updateDoc,
-  doc, 
+  doc,
   query,
   where,
   onSnapshot,
-  serverTimestamp 
+  serverTimestamp
 } from 'firebase/firestore';
 
 const notificationsCollection = collection(db, 'userNotifications');
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
+
+const normalizeRecipient = (recipient) => {
+  if (typeof recipient === 'string') {
+    return { userId: '', userEmail: normalizeEmail(recipient) };
+  }
+
+  const payload = recipient || {};
+  return {
+    userId: (payload.userId || '').trim(),
+    userEmail: normalizeEmail(payload.email || payload.userEmail || ''),
+  };
+};
+
+const buildRecipientQueries = (recipient) => {
+  const clauses = [];
+  if (recipient.userId) clauses.push(query(notificationsCollection, where('userId', '==', recipient.userId)));
+  if (recipient.userEmail) clauses.push(query(notificationsCollection, where('userEmail', '==', recipient.userEmail)));
+  return clauses;
+};
 
 const sortByNewest = (items = []) =>
   [...items].sort((a, b) => {
@@ -21,17 +40,28 @@ const sortByNewest = (items = []) =>
     return bMs - aMs;
   });
 
+const mergeNotifications = (items = []) => {
+  const byId = new Map();
+  items.forEach((item) => {
+    if (!item?.id) return;
+    byId.set(item.id, item);
+  });
+  return sortByNewest([...byId.values()]);
+};
+
 // Create a notification for user when admin replies
 export const createUserNotification = async (notificationData) => {
   try {
     const normalizedEmail = normalizeEmail(notificationData.userEmail);
+    const normalizedUserId = (notificationData.userId || '').trim();
 
-    if (!normalizedEmail) {
-      return { success: false, error: 'Recipient email is required.' };
+    if (!normalizedEmail && !normalizedUserId) {
+      return { success: false, error: 'Recipient email or user ID is required.' };
     }
 
     const docRef = await addDoc(notificationsCollection, {
       userEmail: normalizedEmail,
+      userId: normalizedUserId || null,
       userName: notificationData.userName,
       subject: notificationData.subject || 'Reply to your message',
       message: notificationData.message,
@@ -41,6 +71,7 @@ export const createUserNotification = async (notificationData) => {
       createdAt: serverTimestamp(),
       read: false
     });
+
     return { success: true, id: docRef.id };
   } catch (error) {
     console.error('Error creating user notification:', error);
@@ -48,22 +79,20 @@ export const createUserNotification = async (notificationData) => {
   }
 };
 
-// Get notifications for a specific user by email
-export const getUserNotifications = async (userEmail) => {
+// Get notifications for a specific user by email or uid
+export const getUserNotifications = async (recipientValue) => {
   try {
-    const normalizedEmail = normalizeEmail(userEmail);
-    if (!normalizedEmail) return [];
+    const recipient = normalizeRecipient(recipientValue);
+    if (!recipient.userEmail && !recipient.userId) return [];
 
-    const q = query(
-      notificationsCollection, 
-      where('userEmail', '==', normalizedEmail)
+    const snapshots = await Promise.all(
+      buildRecipientQueries(recipient).map((recipientQuery) => getDocs(recipientQuery))
     );
-    const snapshot = await getDocs(q);
-    const notifications = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    return sortByNewest(notifications);
+    const notifications = snapshots.flatMap((snapshot) =>
+      snapshot.docs.map((notificationDoc) => ({ id: notificationDoc.id, ...notificationDoc.data() }))
+    );
+
+    return mergeNotifications(notifications);
   } catch (error) {
     console.error('Error getting user notifications:', error);
     throw error;
@@ -71,51 +100,48 @@ export const getUserNotifications = async (userEmail) => {
 };
 
 // Realtime notifications subscription for immediate UI updates
-export const subscribeToUserNotifications = (userEmail, callback) => {
-  const normalizedEmail = normalizeEmail(userEmail);
+export const subscribeToUserNotifications = (recipientValue, callback) => {
+  const recipient = normalizeRecipient(recipientValue);
 
-  if (!normalizedEmail) {
+  if (!recipient.userEmail && !recipient.userId) {
     callback([]);
     return () => {};
   }
 
-  const q = query(
-    notificationsCollection,
-    where('userEmail', '==', normalizedEmail)
-  );
+  const queryKeys = [];
+  const queryResults = {};
+  const unsubscribers = buildRecipientQueries(recipient).map((recipientQuery, idx) => {
+    const key = `query-${idx}`;
+    queryKeys.push(key);
+    queryResults[key] = [];
 
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const notifications = snapshot.docs.map((document) => ({
-        id: document.id,
-        ...document.data()
-      }));
+    return onSnapshot(
+      recipientQuery,
+      (snapshot) => {
+        queryResults[key] = snapshot.docs.map((notificationDoc) => ({
+          id: notificationDoc.id,
+          ...notificationDoc.data()
+        }));
+        callback(mergeNotifications(queryKeys.flatMap((queryKey) => queryResults[queryKey] || [])));
+      },
+      (error) => {
+        console.error('Error subscribing to user notifications:', error);
+        queryResults[key] = [];
+        callback(mergeNotifications(queryKeys.flatMap((queryKey) => queryResults[queryKey] || [])));
+      }
+    );
+  });
 
-      callback(sortByNewest(notifications));
-    },
-    (error) => {
-      console.error('Error subscribing to user notifications:', error);
-      callback([]);
-    }
-  );
+  return () => {
+    unsubscribers.forEach((unsubscribe) => unsubscribe());
+  };
 };
 
 // Get unread count for a user
-export const getUnreadCount = async (userEmail) => {
+export const getUnreadCount = async (recipientValue) => {
   try {
-    const normalizedEmail = normalizeEmail(userEmail);
-    if (!normalizedEmail) return 0;
-
-    const q = query(
-      notificationsCollection, 
-      where('userEmail', '==', normalizedEmail)
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.reduce((count, document) => {
-      const data = document.data();
-      return data.read ? count : count + 1;
-    }, 0);
+    const notifications = await getUserNotifications(recipientValue);
+    return notifications.reduce((count, notification) => (notification.read ? count : count + 1), 0);
   } catch (error) {
     console.error('Error getting unread count:', error);
     return 0;
@@ -125,9 +151,7 @@ export const getUnreadCount = async (userEmail) => {
 // Mark notification as read
 export const markNotificationAsRead = async (notificationId) => {
   try {
-    await updateDoc(doc(db, 'userNotifications', notificationId), {
-      read: true
-    });
+    await updateDoc(doc(db, 'userNotifications', notificationId), { read: true });
     return { success: true };
   } catch (error) {
     console.error('Error marking notification as read:', error);
@@ -136,22 +160,27 @@ export const markNotificationAsRead = async (notificationId) => {
 };
 
 // Mark all notifications as read for a user
-export const markAllAsRead = async (userEmail) => {
+export const markAllAsRead = async (recipientValue) => {
   try {
-    const normalizedEmail = normalizeEmail(userEmail);
-    if (!normalizedEmail) return { success: true };
+    const recipient = normalizeRecipient(recipientValue);
+    if (!recipient.userEmail && !recipient.userId) return { success: true };
 
-    const q = query(
-      notificationsCollection, 
-      where('userEmail', '==', normalizedEmail)
+    const snapshots = await Promise.all(
+      buildRecipientQueries(recipient).map((recipientQuery) => getDocs(recipientQuery))
     );
-    const snapshot = await getDocs(q);
-    
-    const updatePromises = snapshot.docs.map(doc => 
-      doc.data().read ? Promise.resolve() : updateDoc(doc.ref, { read: true })
+    const docsById = new Map();
+    snapshots.forEach((snapshot) => {
+      snapshot.docs.forEach((notificationDoc) => {
+        docsById.set(notificationDoc.id, notificationDoc);
+      });
+    });
+
+    await Promise.all(
+      [...docsById.values()].map((notificationDoc) =>
+        notificationDoc.data().read ? Promise.resolve() : updateDoc(notificationDoc.ref, { read: true })
+      )
     );
-    
-    await Promise.all(updatePromises);
+
     return { success: true };
   } catch (error) {
     console.error('Error marking all as read:', error);

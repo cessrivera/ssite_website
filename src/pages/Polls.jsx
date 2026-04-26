@@ -7,6 +7,9 @@ const Polls = () => {
   const [loading, setLoading] = useState(true);
   const [selectedPoll, setSelectedPoll] = useState(null);
   const [selectedOption, setSelectedOption] = useState(null);
+  const [voteError, setVoteError] = useState('');
+  const [voteSuccess, setVoteSuccess] = useState('');
+  const [voteSuccessPollId, setVoteSuccessPollId] = useState(null);
   const { currentUser } = useAuth();
 
   const pollVisualThemes = [
@@ -66,10 +69,11 @@ const Polls = () => {
 
   useEffect(() => {
     loadPolls();
-  }, []);
+  }, [currentUser?.uid]);
 
   const loadPolls = async () => {
     try {
+      setVoteError('');
       const data = await getPolls();
       setPolls(data.filter(p => p.active));
     } catch (error) {
@@ -81,21 +85,35 @@ const Polls = () => {
 
   const handleVote = async (pollId, optionIndex) => {
     if (!currentUser) {
+      setVoteError('Please log in to submit your vote.');
+      return;
+    }
+    if (optionIndex === null || optionIndex === undefined) {
+      setVoteError('Please select an option first.');
       return;
     }
 
     const poll = polls.find(p => p.id === pollId);
     if (poll.votedUsers?.includes(currentUser.uid)) {
+      setVoteError('You have already voted in this poll.');
       return;
     }
 
     try {
+      setVoteError('');
+      setVoteSuccess('');
+      setVoteSuccessPollId(null);
       await votePoll(pollId, optionIndex, currentUser.uid);
-      loadPolls();
+      await loadPolls();
       setSelectedPoll(null);
       setSelectedOption(null);
+      setVoteSuccess('Your vote has been submitted successfully.');
+      setVoteSuccessPollId(pollId);
     } catch (error) {
       console.error('Error voting:', error);
+      setVoteError(error.message || 'Unable to submit your vote right now.');
+      setVoteSuccess('');
+      setVoteSuccessPollId(null);
     }
   };
 
@@ -180,6 +198,12 @@ const Polls = () => {
                   {/* Poll Header */}
                   <div className="p-6 md:p-8 border-b border-gray-100">
                     <h2 className="text-xl font-bold text-gray-900 mb-4">{poll.question}</h2>
+                    {voteError && selectedPoll === poll.id && (
+                      <p className="text-sm text-red-600 mb-3">{voteError}</p>
+                    )}
+                    {voteSuccess && voteSuccessPollId === poll.id && (
+                      <p className="text-sm text-emerald-600 mb-3">{voteSuccess}</p>
+                    )}
                     
                     <div className="flex flex-wrap items-center gap-4 text-sm">
                       <span className="flex items-center gap-2 text-gray-500 bg-gray-50 px-3 py-1.5 rounded-full">
@@ -289,7 +313,11 @@ const Polls = () => {
 
                         {!hasVoted && currentUser && (
                           <button
-                            onClick={() => setSelectedPoll(poll.id)}
+                            onClick={() => {
+                              setSelectedPoll(poll.id);
+                              setSelectedOption(null);
+                              setVoteError('');
+                            }}
                             className="w-full bg-blue-50 text-blue-900 border-2 border-blue-200 px-6 py-3 rounded-xl font-semibold hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
