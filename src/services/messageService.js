@@ -2,6 +2,7 @@ import { auth, db } from '../config/firebase';
 import { 
   collection, 
   addDoc, 
+  getDoc,
   getDocs, 
   deleteDoc, 
   doc, 
@@ -18,7 +19,10 @@ const normalizeEmail = (email = '') => email.trim().toLowerCase();
 export const createMessage = async (messageData) => {
   try {
     const name = (messageData.name || '').trim();
-    const email = normalizeEmail(messageData.email || '');
+    const authEmail = (auth.currentUser?.email || '').trim();
+    const providedEmail = (messageData.email || '').trim();
+    const email = authEmail || providedEmail;
+    const emailNormalized = normalizeEmail(email);
     const message = (messageData.message || '').trim();
 
     if (!name || !email || !message) {
@@ -28,8 +32,10 @@ export const createMessage = async (messageData) => {
     const docRef = await addDoc(messagesCollection, {
       name,
       email,
+      emailNormalized,
       message,
       senderUid: auth.currentUser?.uid || null,
+      senderAuthEmail: authEmail || null,
       createdAt: serverTimestamp(),
       status: 'unread'
     });
@@ -76,10 +82,37 @@ export const replyToMessage = async (messageId, replyData, originalMessage) => {
     });
 
     // Create a notification for the user so they can see the reply
-    if (originalMessage && originalMessage.email) {
+    if (originalMessage) {
+      let recipientUserId = (originalMessage.senderUid || '').trim();
+      let recipientEmail = (originalMessage.senderAuthEmail || originalMessage.email || '').trim();
+
+      if (recipientUserId && !recipientEmail) {
+        const userDoc = await getDoc(doc(db, 'users', recipientUserId));
+        if (userDoc.exists()) {
+          recipientEmail = (userDoc.data()?.email || '').trim();
+        }
+      }
+
+      if (!recipientUserId && recipientEmail) {
+        const usersByExactEmail = await getDocs(
+          query(collection(db, 'users'), where('email', '==', recipientEmail))
+        );
+
+        if (!usersByExactEmail.empty) {
+          recipientUserId = usersByExactEmail.docs[0].id;
+        } else {
+          const usersByNormalizedEmail = await getDocs(
+            query(collection(db, 'users'), where('email', '==', normalizeEmail(recipientEmail)))
+          );
+          if (!usersByNormalizedEmail.empty) {
+            recipientUserId = usersByNormalizedEmail.docs[0].id;
+          }
+        }
+      }
+
       await createUserNotification({
-        userEmail: originalMessage.email,
-        userId: originalMessage.senderUid || null,
+        userEmail: recipientEmail || originalMessage.email || '',
+        userId: recipientUserId || null,
         userName: originalMessage.name,
         subject: 'Reply to your message',
         message: replyData.content,

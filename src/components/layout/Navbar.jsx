@@ -13,7 +13,6 @@ const Navbar = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef(null);
   const messagesRef = useRef(null);
-  const normalizeEmail = (email = '') => email.trim().toLowerCase();
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -37,7 +36,7 @@ const Navbar = () => {
       return () => {};
     }
 
-    const email = normalizeEmail(userData?.email || currentUser?.email || '');
+    const email = (userData?.email || currentUser?.email || '').trim();
     if (!email) {
       setNotifications([]);
       setUnreadCount(0);
@@ -46,14 +45,15 @@ const Navbar = () => {
 
     const unsubscribe = subscribeToUserNotifications({
       userId: currentUser?.uid || '',
-      email
+      email,
+      emailNormalized: email.toLowerCase()
     }, (data) => {
       setNotifications(data);
       setUnreadCount(data.filter((item) => !item.read).length);
     });
 
     return () => unsubscribe();
-  }, [isAuthenticated, isAdmin, userData?.email, currentUser?.email]);
+  }, [isAuthenticated, isAdmin, userData?.email, currentUser?.email, currentUser?.uid]);
 
   const handleMarkAsRead = async (notificationId) => {
     await markNotificationAsRead(notificationId);
@@ -67,7 +67,8 @@ const Navbar = () => {
     if (currentUser?.uid || userData?.email || currentUser?.email) {
       await markAllAsRead({
         userId: currentUser?.uid || '',
-        email: userData?.email || currentUser?.email || ''
+        email: (userData?.email || currentUser?.email || '').trim(),
+        emailNormalized: (userData?.email || currentUser?.email || '').trim().toLowerCase()
       });
       setNotifications(notifications.map(n => ({ ...n, read: true })));
       setUnreadCount(0);

@@ -16,13 +16,20 @@ const normalizeEmail = (email = '') => email.trim().toLowerCase();
 
 const normalizeRecipient = (recipient) => {
   if (typeof recipient === 'string') {
-    return { userId: '', userEmail: normalizeEmail(recipient) };
+    const rawEmail = recipient.trim();
+    return {
+      userId: '',
+      userEmail: rawEmail,
+      userEmailNormalized: normalizeEmail(rawEmail),
+    };
   }
 
   const payload = recipient || {};
+  const rawEmail = (payload.email || payload.userEmail || '').trim();
   return {
     userId: (payload.userId || '').trim(),
-    userEmail: normalizeEmail(payload.email || payload.userEmail || ''),
+    userEmail: rawEmail,
+    userEmailNormalized: normalizeEmail(payload.emailNormalized || payload.userEmailNormalized || rawEmail),
   };
 };
 
@@ -30,6 +37,12 @@ const buildRecipientQueries = (recipient) => {
   const clauses = [];
   if (recipient.userId) clauses.push(query(notificationsCollection, where('userId', '==', recipient.userId)));
   if (recipient.userEmail) clauses.push(query(notificationsCollection, where('userEmail', '==', recipient.userEmail)));
+  if (recipient.userEmailNormalized && recipient.userEmailNormalized !== recipient.userEmail) {
+    clauses.push(query(notificationsCollection, where('userEmail', '==', recipient.userEmailNormalized)));
+  }
+  if (recipient.userEmailNormalized) {
+    clauses.push(query(notificationsCollection, where('userEmailNormalized', '==', recipient.userEmailNormalized)));
+  }
   return clauses;
 };
 
@@ -52,7 +65,8 @@ const mergeNotifications = (items = []) => {
 // Create a notification for user when admin replies
 export const createUserNotification = async (notificationData) => {
   try {
-    const normalizedEmail = normalizeEmail(notificationData.userEmail);
+    const rawEmail = (notificationData.userEmail || '').trim();
+    const normalizedEmail = normalizeEmail(rawEmail);
     const normalizedUserId = (notificationData.userId || '').trim();
 
     if (!normalizedEmail && !normalizedUserId) {
@@ -60,7 +74,8 @@ export const createUserNotification = async (notificationData) => {
     }
 
     const docRef = await addDoc(notificationsCollection, {
-      userEmail: normalizedEmail,
+      userEmail: rawEmail || normalizedEmail,
+      userEmailNormalized: normalizedEmail || null,
       userId: normalizedUserId || null,
       userName: notificationData.userName,
       subject: notificationData.subject || 'Reply to your message',
@@ -83,7 +98,7 @@ export const createUserNotification = async (notificationData) => {
 export const getUserNotifications = async (recipientValue) => {
   try {
     const recipient = normalizeRecipient(recipientValue);
-    if (!recipient.userEmail && !recipient.userId) return [];
+    if (!recipient.userEmail && !recipient.userEmailNormalized && !recipient.userId) return [];
 
     const snapshots = await Promise.all(
       buildRecipientQueries(recipient).map((recipientQuery) => getDocs(recipientQuery))
@@ -103,7 +118,7 @@ export const getUserNotifications = async (recipientValue) => {
 export const subscribeToUserNotifications = (recipientValue, callback) => {
   const recipient = normalizeRecipient(recipientValue);
 
-  if (!recipient.userEmail && !recipient.userId) {
+  if (!recipient.userEmail && !recipient.userEmailNormalized && !recipient.userId) {
     callback([]);
     return () => {};
   }
@@ -163,7 +178,7 @@ export const markNotificationAsRead = async (notificationId) => {
 export const markAllAsRead = async (recipientValue) => {
   try {
     const recipient = normalizeRecipient(recipientValue);
-    if (!recipient.userEmail && !recipient.userId) return { success: true };
+    if (!recipient.userEmail && !recipient.userEmailNormalized && !recipient.userId) return { success: true };
 
     const snapshots = await Promise.all(
       buildRecipientQueries(recipient).map((recipientQuery) => getDocs(recipientQuery))
