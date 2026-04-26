@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getOfficers, createOfficer, updateOfficer, deleteOfficer } from '../../services/officerService';
 import ImageUploader from '../../components/common/ImageUploader';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import Modal from '../../components/common/Modal';
 
 const AdminOfficers = () => {
   const now = new Date();
@@ -193,10 +194,13 @@ const AdminOfficers = () => {
 
       {/* Add/Edit Form */}
       {showForm && (
-        <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">
-            {editingOfficer ? 'Edit Officer' : 'Add New Officer'}
-          </h2>
+        <Modal
+          isOpen={showForm}
+          onClose={resetForm}
+          title={editingOfficer ? 'Edit Officer' : 'Add New Officer'}
+          size="3xl"
+          backdropClassName="bg-linear-to-br from-blue-100/70 via-white/70 to-slate-100/75 backdrop-blur-[2px]"
+        >
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -223,7 +227,7 @@ const AdminOfficers = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Course</label>
                 <div className="relative">
@@ -336,7 +340,7 @@ const AdminOfficers = () => {
               </button>
             </div>
           </form>
-        </div>
+        </Modal>
       )}
 
       {/* Officers Grid */}

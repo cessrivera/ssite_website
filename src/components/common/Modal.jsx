@@ -1,6 +1,14 @@
 import React from 'react';
 
-const Modal = ({ isOpen, onClose, title, children, size = 'md', closeButton = true }) => {
+const Modal = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+  size = 'md',
+  closeButton = true,
+  backdropClassName = 'bg-black/50'
+}) => {
   if (!isOpen) return null;
 
   const handleBackdropClick = (e) => {
@@ -24,7 +32,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md', closeButton = tr
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity duration-300"
+        className={`fixed inset-0 z-40 transition-opacity duration-300 ${backdropClassName}`}
         onClick={handleBackdropClick}
       />
 

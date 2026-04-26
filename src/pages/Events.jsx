@@ -387,7 +387,13 @@ const Events = () => {
       </div>
 
       {/* Date Events Modal */}
-      <Modal isOpen={showDateModal} onClose={() => setShowDateModal(false)} title={selectedDateStr} size="lg">
+      <Modal
+        isOpen={showDateModal}
+        onClose={() => setShowDateModal(false)}
+        title={selectedDateStr}
+        size="3xl"
+        backdropClassName="bg-linear-to-br from-blue-100/70 via-white/70 to-slate-100/75 backdrop-blur-[2px]"
+      >
         {selectedDateEvents.length === 0 ? (
           <div className="text-center py-8">
             <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">

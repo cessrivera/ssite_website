@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getEvents, createEvent, updateEvent, deleteEvent, archiveEvent, unarchiveEvent } from '../../services/eventService';
 import ImageUploader from '../../components/common/ImageUploader';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import Modal from '../../components/common/Modal';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 
@@ -173,98 +174,99 @@ const AdminEvents = () => {
       </div>
 
       {/* Add/Edit Form */}
-      {showForm && (
-        <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">
-            {editingEvent ? 'Edit Event' : 'Create New Event'}
-          </h2>
-          <form onSubmit={handleSubmit} className="space-y-5">
+      <Modal
+        isOpen={showForm}
+        onClose={resetForm}
+        title={editingEvent ? 'Edit Event' : 'Create New Event'}
+        size="3xl"
+        backdropClassName="bg-linear-to-br from-blue-100/70 via-white/70 to-slate-100/75 backdrop-blur-[2px]"
+      >
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Event Title *</label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Event Title *</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Date *</label>
               <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                 className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 required
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Date *</label>
-                <input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Time</label>
-                <input
-                  type="text"
-                  placeholder="e.g., 9:00 AM - 4:00 PM"
-                  value={formData.time}
-                  onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Venue</label>
-                <input
-                  type="text"
-                  placeholder="e.g., UA Auditorium"
-                  value={formData.venue}
-                  onChange={(e) => setFormData({ ...formData, venue: e.target.value })}
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                />
-              </div>
-            </div>
-
-            <ImageUploader
-              value={formData.imageUrl}
-              onChange={(url) => setFormData({ ...formData, imageUrl: url })}
-              folder="ssite/events"
-              label="Event Image"
-            />
-
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-              <ReactQuill
-                theme="snow"
-                value={formData.description}
-                onChange={(value) => setFormData({ ...formData, description: value })}
-                modules={quillModules}
-                formats={quillFormats}
-                className="bg-white rounded-xl [&_.ql-toolbar]:rounded-t-xl [&_.ql-toolbar]:border-gray-200 [&_.ql-container]:rounded-b-xl [&_.ql-container]:border-gray-200 [&_.ql-editor]:min-h-[100px]"
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Time</label>
+              <input
+                type="text"
+                placeholder="e.g., 9:00 AM - 4:00 PM"
+                value={formData.time}
+                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
             </div>
 
-            <div className="flex gap-3 pt-2">
-              <button
-                type="submit"
-                className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center gap-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                {editingEvent ? 'Update Event' : 'Create Event'}
-              </button>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="border-2 border-gray-200 px-6 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors text-gray-600"
-              >
-                Cancel
-              </button>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Venue</label>
+              <input
+                type="text"
+                placeholder="e.g., UA Auditorium"
+                value={formData.venue}
+                onChange={(e) => setFormData({ ...formData, venue: e.target.value })}
+                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              />
             </div>
-          </form>
-        </div>
-      )}
+          </div>
+
+          <ImageUploader
+            value={formData.imageUrl}
+            onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+            folder="ssite/events"
+            label="Event Image"
+          />
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+            <ReactQuill
+              theme="snow"
+              value={formData.description}
+              onChange={(value) => setFormData({ ...formData, description: value })}
+              modules={quillModules}
+              formats={quillFormats}
+              className="bg-white rounded-xl [&_.ql-toolbar]:rounded-t-xl [&_.ql-toolbar]:border-gray-200 [&_.ql-container]:rounded-b-xl [&_.ql-container]:border-gray-200 [&_.ql-editor]:min-h-[100px]"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="submit"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              {editingEvent ? 'Update Event' : 'Create Event'}
+            </button>
+            <button
+              type="button"
+              onClick={resetForm}
+              className="border-2 border-gray-200 px-6 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors text-gray-600"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Tab Toggle */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

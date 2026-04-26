@@ -1,18 +1,19 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useState, useEffect, useRef } from 'react';
-import { getUserNotifications, markNotificationAsRead, markAllAsRead } from '../../services/userNotificationService';
+import { subscribeToUserNotifications, markNotificationAsRead, markAllAsRead } from '../../services/userNotificationService';
 
 const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, userData, logout, isAdmin } = useAuth();
+  const { currentUser, isAuthenticated, userData, logout, isAdmin } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef(null);
   const messagesRef = useRef(null);
+  const normalizeEmail = (email = '') => email.trim().toLowerCase();
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -28,25 +29,28 @@ const Navbar = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch user notifications
+  // Subscribe to user notifications in realtime
   useEffect(() => {
-    const fetchNotifications = async () => {
-      if (isAuthenticated && userData?.email && !isAdmin) {
-        try {
-          const data = await getUserNotifications(userData.email);
-          setNotifications(data);
-          setUnreadCount(data.filter(n => !n.read).length);
-        } catch (error) {
-          console.error('Error fetching notifications:', error);
-        }
-      }
-    };
+    if (!isAuthenticated || isAdmin) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return () => {};
+    }
 
-    fetchNotifications();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated, userData, isAdmin]);
+    const email = normalizeEmail(userData?.email || currentUser?.email || '');
+    if (!email) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return () => {};
+    }
+
+    const unsubscribe = subscribeToUserNotifications(email, (data) => {
+      setNotifications(data);
+      setUnreadCount(data.filter((item) => !item.read).length);
+    });
+
+    return () => unsubscribe();
+  }, [isAuthenticated, isAdmin, userData?.email, currentUser?.email]);
 
   const handleMarkAsRead = async (notificationId) => {
     await markNotificationAsRead(notificationId);

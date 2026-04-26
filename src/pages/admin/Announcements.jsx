@@ -173,6 +173,7 @@ const AdminAnnouncements = () => {
         onClose={resetForm}
         title={editingAnnouncement ? 'Edit Announcement' : 'Create New Announcement'}
         size="3xl"
+        backdropClassName="bg-linear-to-br from-blue-100/70 via-white/70 to-slate-100/75 backdrop-blur-[2px]"
       >
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>

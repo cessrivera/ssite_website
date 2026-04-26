@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getPolls, createPoll, updatePoll, deletePoll } from '../../services/pollService';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import Modal from '../../components/common/Modal';
 
 const AdminPolls = () => {
   const [polls, setPolls] = useState([]);
@@ -123,20 +124,14 @@ const AdminPolls = () => {
       <div className="max-w-4xl mx-auto space-y-6">
 
       {/* Create Poll Form */}
-      {showForm && (
-        <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 border border-gray-100">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {editingPoll ? 'Edit Poll' : 'Create New Poll'}
-            </h2>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
+      <Modal
+        isOpen={showForm}
+        onClose={resetForm}
+        title={editingPoll ? 'Edit Poll' : 'Create New Poll'}
+        size="2xl"
+        backdropClassName="bg-linear-to-br from-blue-100/70 via-white/70 to-slate-100/75 backdrop-blur-[2px]"
+      >
+        <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Poll Question *</label>
               <input
@@ -207,9 +202,8 @@ const AdminPolls = () => {
                 Cancel
               </button>
             </div>
-          </form>
-        </div>
-      )}
+        </form>
+      </Modal>
 
       {/* Results Modal */}
       {showResults && (

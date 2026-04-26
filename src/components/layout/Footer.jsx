@@ -39,7 +39,7 @@ const Footer = () => {
           {/* Connect */}
           <div>
             <h4 className="font-semibold mb-4 text-yellow-400">Connect With Us</h4>
-            <div className="mt-1 flex items-start justify-between gap-4">
+            <div className="mt-2 flex items-start justify-between gap-8">
               <div>
                 <div className="flex items-center gap-3">
                   <a
@@ -58,9 +58,9 @@ const Footer = () => {
                   College of Information Technology
                 </p>
               </div>
-              <div className="shrink-0 flex flex-col items-center text-center">
-                <p className="text-xs text-blue-300 mb-2 whitespace-nowrap">Scan to visit our pages</p>
-                <div className="flex items-start gap-3">
+              <div className="shrink-0 min-w-52 flex flex-col items-start text-left">
+                <p className="text-xs text-yellow-400 mb-5 leading-relaxed max-w-55">Scan to visit: CIT Website and Research Archive</p>
+                <div className="flex items-start gap-6">
                   <div className="flex flex-col items-center">
                     <a
                       href={websiteUrl}
@@ -75,7 +75,7 @@ const Footer = () => {
                         loading="lazy"
                       />
                     </a>
-                    <span className="mt-1 text-[10px] text-blue-300">Website</span>
+                    <span className="mt-1 text-[10px] text-blue-300">CIT Website</span>
                   </div>
                   <div className="flex flex-col items-center">
                     <a
@@ -91,7 +91,7 @@ const Footer = () => {
                         loading="lazy"
                       />
                     </a>
-                    <span className="mt-1 text-[10px] text-blue-300">Research</span>
+                    <span className="mt-1 text-[10px] text-blue-300">Research Archive</span>
                   </div>
                 </div>
               </div>

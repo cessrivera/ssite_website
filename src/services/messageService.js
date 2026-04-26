@@ -1,4 +1,4 @@
-import { db } from '../config/firebase';
+import { auth, db } from '../config/firebase';
 import { 
   collection, 
   addDoc, 
@@ -13,11 +13,23 @@ import {
 import { createUserNotification } from './userNotificationService';
 
 const messagesCollection = collection(db, 'messages');
+const normalizeEmail = (email = '') => email.trim().toLowerCase();
 
 export const createMessage = async (messageData) => {
   try {
+    const name = (messageData.name || '').trim();
+    const email = normalizeEmail(messageData.email || '');
+    const message = (messageData.message || '').trim();
+
+    if (!name || !email || !message) {
+      return { success: false, error: 'Name, email, and message are required.' };
+    }
+
     const docRef = await addDoc(messagesCollection, {
-      ...messageData,
+      name,
+      email,
+      message,
+      senderUid: auth.currentUser?.uid || null,
       createdAt: serverTimestamp(),
       status: 'unread'
     });
@@ -67,10 +79,12 @@ export const replyToMessage = async (messageId, replyData, originalMessage) => {
     if (originalMessage && originalMessage.email) {
       await createUserNotification({
         userEmail: originalMessage.email,
+        userId: originalMessage.senderUid || null,
         userName: originalMessage.name,
         subject: 'Reply to your message',
         message: replyData.content,
         originalMessage: originalMessage.message,
+        messageId,
         repliedBy: replyData.adminEmail || 'Admin'
       });
     }

@@ -1,12 +1,34 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 
 const AdminLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, userData, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+
+  useEffect(() => {
+    const unreadMessagesQuery = query(
+      collection(db, 'messages'),
+      where('status', '==', 'unread')
+    );
+
+    const unsubscribe = onSnapshot(
+      unreadMessagesQuery,
+      (snapshot) => {
+        setUnreadMessagesCount(snapshot.size);
+      },
+      (error) => {
+        console.error('Error subscribing to unread message count:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   const sidebarLinks = [
     { 
@@ -203,7 +225,12 @@ const AdminLayout = () => {
                     }`}
                   >
                     {link.icon}
-                    {link.label}
+                    <span className="flex-1">{link.label}</span>
+                    {link.path === '/admin/messages' && unreadMessagesCount > 0 && (
+                      <span className="min-w-6 h-6 px-2 rounded-full bg-red-500 text-white text-xs font-semibold flex items-center justify-center">
+                        {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+                      </span>
+                    )}
                   </Link>
                 </li>
               ))}

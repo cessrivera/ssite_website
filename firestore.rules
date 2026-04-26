@@ -81,6 +81,13 @@ service cloud.firestore {
       allow write: if isPrimaryAdmin();
     }
 
+    match /userNotifications/{notificationId} {
+      allow read: if isPrimaryAdmin() || (isSignedIn() && resource.data.userEmail == request.auth.token.email);
+      allow create: if isPrimaryAdmin();
+      allow update: if isPrimaryAdmin() || (isSignedIn() && resource.data.userEmail == request.auth.token.email);
+      allow delete: if isPrimaryAdmin();
+    }
+
     match /settings/{document=**} {
       allow read: if true;
       allow write: if isPrimaryAdmin();
