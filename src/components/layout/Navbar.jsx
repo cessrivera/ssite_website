@@ -9,6 +9,7 @@ const Navbar = () => {
   const { currentUser, isAuthenticated, userData, logout, isAdmin } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef(null);
@@ -27,6 +28,10 @@ const Navbar = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    setShowMobileMenu(false);
+  }, [location.pathname]);
 
   // Subscribe to user notifications in realtime
   useEffect(() => {
@@ -94,7 +99,7 @@ const Navbar = () => {
 
   const navLinks = [
     { path: '/', label: 'Home' },
-    { path: '/announcements', label: 'Announcements' },
+    { path: '/announcements', label: 'Updates' },
     { path: '/events', label: 'Events' },
     { path: '/officers', label: 'Officers' },
     { path: '/polls', label: 'Polls' },
@@ -126,9 +131,12 @@ const Navbar = () => {
         <div className="flex justify-between items-center h-18 py-3">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
-            <img src="/CIT new logo.png" alt="CIT Logo" className="w-14 h-14 transition-transform group-hover:scale-105" />
+            <img
+              src="/CIT new logo.png"
+              alt="SSITE Logo"
+              className="h-10 w-auto transition-transform group-hover:scale-105 sm:h-12"
+            />
             <div className="hidden sm:block">
-              <h1 className="text-xl font-bold text-blue-900 tracking-tight">SSITE</h1>
               <p className="text-xs text-gray-500">Student Society on Information Technology Education</p>
             </div>
           </Link>
@@ -151,7 +159,7 @@ const Navbar = () => {
           </div>
 
           {/* Login Button or User Profile */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Messages Icon for Users (not admin) */}
             {isAuthenticated && userData && !isAdmin && (
               <div className="relative" ref={messagesRef}>
@@ -171,7 +179,7 @@ const Navbar = () => {
 
                 {/* Messages Dropdown */}
                 {showMessages && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden">
+                  <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden">
                     <div className="px-4 py-3 bg-gradient-to-r from-blue-900 to-blue-700 flex items-center justify-between">
                       <h3 className="text-white font-semibold">Messages</h3>
                       {unreadCount > 0 && (
@@ -240,7 +248,7 @@ const Navbar = () => {
                 </button>
 
                 {showDropdown && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden">
+                  <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden">
                     <div className="px-4 py-4 bg-gradient-to-br from-blue-50 to-white border-b">
                       <p className="text-sm font-semibold text-gray-900">{userData.fullName}</p>
                       <p className="text-xs text-gray-500 mt-0.5">{userData.email}</p>
@@ -279,8 +287,41 @@ const Navbar = () => {
                 Login
               </Link>
             )}
+
+            <button
+              type="button"
+              onClick={() => setShowMobileMenu((prev) => !prev)}
+              className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+              aria-label="Toggle navigation menu"
+              aria-expanded={showMobileMenu}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
           </div>
         </div>
+
+        {showMobileMenu && (
+          <div className="md:hidden border-t border-gray-100 py-3">
+            <div className="flex flex-col gap-1">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  onClick={() => setShowMobileMenu(false)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive(link.path)
+                      ? 'text-blue-900 bg-blue-50'
+                      : 'text-gray-600 hover:text-blue-900 hover:bg-gray-50'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </nav>
   );

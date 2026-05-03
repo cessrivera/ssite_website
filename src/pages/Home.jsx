@@ -27,7 +27,7 @@ const Home = () => {
 
   // Quick access items based on wireframe
   const quickAccess = [
-    { icon: '📢', label: 'Announcements', sublabel: 'Latest Updates', path: '/announcements', color: 'from-blue-500 to-blue-600' },
+    { icon: '📢', label: 'Updates', sublabel: 'Latest Updates', path: '/announcements', color: 'from-blue-500 to-blue-600' },
     { icon: '📅', label: 'Events', sublabel: 'Upcoming Activities', path: '/events', color: 'from-purple-500 to-purple-600' },
     { icon: '👥', label: 'Officers', sublabel: 'Meet the Team', path: '/officers', color: 'from-emerald-500 to-emerald-600' },
     { icon: '📊', label: 'Polls', sublabel: 'Vote Now', path: '/polls', color: 'from-amber-500 to-amber-600' },
@@ -71,7 +71,7 @@ const Home = () => {
                 to="/announcements"
                 className="bg-white/10 backdrop-blur text-white border-2 border-white/30 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-white/20 transition-all duration-200"
               >
-                View Announcements
+                View Updates
               </Link>
             </div>
           </div>
@@ -111,16 +111,16 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Featured Announcement */}
+      {/* Featured Update */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-10">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Featured Announcement</h2>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Featured Update</h2>
               <p className="text-gray-600">Stay updated with our latest news</p>
             </div>
             <Link to="/announcements" className="hidden sm:flex items-center gap-2 text-blue-900 font-medium hover:text-blue-700 transition-colors">
-              View All
+              View All Updates
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
@@ -132,7 +132,7 @@ const Home = () => {
               type="button"
               onClick={() => setSelectedAnnouncement(featuredAnnouncement)}
               className="w-full text-left bg-linear-to-br from-gray-50 to-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300"
-              aria-label={`Open announcement: ${featuredAnnouncement.title}`}
+              aria-label={`Open update: ${featuredAnnouncement.title}`}
             >
               <div className="grid md:grid-cols-2 gap-0">
                 {featuredAnnouncement.imageUrl && featuredAnnouncement.imageUrl.trim() !== '' ? (
@@ -172,7 +172,7 @@ const Home = () => {
                   </div>
                   <h3 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 leading-tight">{featuredAnnouncement.title}</h3>
                   {renderContent(featuredAnnouncement.content)}
-                  <p className="text-sm font-medium text-blue-900">Click to view full announcement</p>
+                  <p className="text-sm font-medium text-blue-900">Click to view full update</p>
                 </div>
               </div>
             </button>
@@ -181,18 +181,18 @@ const Home = () => {
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">📢</span>
               </div>
-              <p className="text-gray-500">No announcements yet</p>
+              <p className="text-gray-500">No updates yet</p>
             </div>
           )}
         </div>
       </section>
 
-      {/* Latest Announcements */}
+      {/* Latest Updates */}
       <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-10">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Latest Announcements</h2>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Latest Updates</h2>
               <p className="text-gray-600">Don't miss any important updates</p>
             </div>
           </div>
@@ -200,7 +200,7 @@ const Home = () => {
           {loading ? (
             <div className="text-center py-16">
               <div className="w-12 h-12 border-4 border-blue-900 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-500">Loading announcements...</p>
+              <p className="text-gray-500">Loading updates...</p>
             </div>
           ) : latestAnnouncements.length > 0 ? (
             <div className="grid md:grid-cols-3 gap-8">
@@ -210,7 +210,7 @@ const Home = () => {
                   key={announcement.id}
                   onClick={() => setSelectedAnnouncement(announcement)}
                   className="w-full text-left bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 group cursor-pointer"
-                  aria-label={`Open announcement: ${announcement.title}`}
+                  aria-label={`Open update: ${announcement.title}`}
                 >
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold mb-4 ${
                     announcement.category === 'Academic' ? 'bg-blue-100 text-blue-700' :
@@ -235,7 +235,7 @@ const Home = () => {
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">📋</span>
               </div>
-              <p className="text-gray-500">No announcements available</p>
+              <p className="text-gray-500">No updates available</p>
             </div>
           )}
         </div>

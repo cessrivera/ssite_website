@@ -71,9 +71,35 @@ const AdminMembers = () => {
           createdAt: user.createdAt
         }));
 
-      // Combine both lists
-      const combinedMembers = [...membersData, ...usersData];
-      setMembers(combinedMembers);
+      const mergeMemberRecord = (primary, secondary) => ({
+        ...secondary,
+        ...primary,
+        name: primary.name || secondary.name,
+        email: primary.email || secondary.email,
+        studentId: primary.studentId || secondary.studentId,
+        course: primary.course || secondary.course,
+        year: primary.year || secondary.year,
+        status: primary.status || secondary.status,
+        role: primary.role || secondary.role,
+        createdAt: primary.createdAt || secondary.createdAt,
+        source: primary.source || secondary.source
+      });
+
+      // Combine both lists, de-duplicating by user id
+      const combinedMap = new Map();
+      membersData.forEach(member => {
+        combinedMap.set(member.id, member);
+      });
+      usersData.forEach(user => {
+        const existing = combinedMap.get(user.id);
+        if (existing) {
+          combinedMap.set(user.id, mergeMemberRecord(existing, user));
+        } else {
+          combinedMap.set(user.id, user);
+        }
+      });
+
+      setMembers(Array.from(combinedMap.values()));
     } catch (error) {
       console.error('Error loading members:', error);
     } finally {

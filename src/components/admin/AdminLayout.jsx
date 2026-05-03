@@ -9,6 +9,7 @@ const AdminLayout = () => {
   const navigate = useNavigate();
   const { currentUser, userData, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
   useEffect(() => {
@@ -29,6 +30,10 @@ const AdminLayout = () => {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [location.pathname]);
 
   const sidebarLinks = [
     { 
@@ -114,16 +119,6 @@ const AdminLayout = () => {
         </svg>
       )
     },
-    {
-      path: '/admin/maintenance',
-      label: 'Maintenance',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      )
-    },
   ];
 
   const isActive = (link) => {
@@ -144,13 +139,24 @@ const AdminLayout = () => {
       <nav className="bg-white shadow-sm fixed top-0 left-0 right-0 z-50 border-b border-gray-100">
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <Link to="/" className="flex items-center gap-3">
-              <img src="/CIT new logo.png" alt="CIT Logo" className="w-12 h-12" />
-              <div className="hidden sm:block">
-                <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">SSITE</h1>
-                <p className="text-xs text-gray-500">Student Society on Information Technology Education</p>
-              </div>
-            </Link>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+                aria-label="Open sidebar"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <Link to="/" className="flex items-center gap-3">
+                <img src="/CIT new logo.png" alt="SSITE Logo" className="h-10 w-auto sm:h-12" />
+                <div className="hidden sm:block">
+                  <p className="text-xs text-gray-500">Student Society on Information Technology Education</p>
+                </div>
+              </Link>
+            </div>
 
             <div className="flex items-center gap-6">
               {/* Admin User Profile */}
@@ -209,15 +215,29 @@ const AdminLayout = () => {
         </div>
       </nav>
 
+      {isSidebarOpen && (
+        <button
+          type="button"
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          aria-label="Close sidebar"
+        />
+      )}
+
       <div className="flex pt-16">
         {/* Sidebar */}
-        <aside className="w-56 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 min-h-screen fixed left-0 top-16 flex flex-col shadow-lg">
-          <nav className="p-4 flex-1">
+        <aside
+          className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col overflow-hidden bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 shadow-lg transition-transform duration-200 md:w-56 md:translate-x-0 pt-16 ${
+            isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <nav className="flex-1 min-h-0 overflow-y-auto p-4">
             <ul className="space-y-1">
               {sidebarLinks.map((link) => (
                 <li key={link.path}>
                   <Link
                     to={link.path}
+                    onClick={() => setIsSidebarOpen(false)}
                     className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
                       isActive(link)
                        ? 'bg-white text-blue-800 font-semibold shadow-md'
@@ -238,14 +258,14 @@ const AdminLayout = () => {
           </nav>
           
           {/* Sidebar Footer */}
-          <div className="border-t border-blue-600 p-4 bg-blue-700">
+          <div className="border-t border-blue-600 p-4 bg-blue-700 shrink-0">
             <p className="text-blue-50 text-xs font-semibold uppercase tracking-wide">Admin Email</p>
             <p className="text-white text-sm truncate font-semibold mt-1">{currentUser?.email}</p>
           </div>
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 ml-56 p-8">
+        <main className="flex-1 ml-0 p-4 sm:p-6 lg:p-8 md:ml-56">
           <Outlet />
         </main>
       </div>

@@ -64,6 +64,15 @@ service cloud.firestore {
                         && request.resource.data.status == 'pending');
       allow update, delete: if isPrimaryAdmin();
     }
+
+    match /memberStudentIds/{studentId} {
+      allow read: if isPrimaryAdmin();
+      allow create: if isSignedIn()
+                    && request.resource.data.userId is string
+                    && request.resource.data.userId == request.auth.uid
+                    && !exists(/databases/$(database)/documents/memberStudentIds/$(studentId));
+      allow update, delete: if isPrimaryAdmin();
+    }
     
     match /messages/{document=**} {
       allow read: if isPrimaryAdmin()

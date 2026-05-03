@@ -13,12 +13,9 @@ const Footer = () => {
         <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-12">
           {/* Brand */}
           <div className="lg:col-span-4">
-            <div className="flex items-center gap-3 mb-5">
-              <img src="/CIT new logo.png" alt="CIT Logo" className="w-12 h-12" />
-              <div>
-                <h3 className="text-xl font-bold">SSITE</h3>
-                <p className="text-xs text-blue-200">Student Society on IT Education</p>
-              </div>
+            <div className="mb-5 flex flex-col items-start gap-1">
+              <h3 className="text-xl font-bold text-white">SSITE</h3>
+              <p className="text-xs text-blue-200">Student Society on IT Education</p>
             </div>
             <p className="max-w-sm text-blue-200 text-sm leading-7">
               Empowering students through technology, innovation, and community building.
@@ -62,7 +59,7 @@ const Footer = () => {
           {/* Scan Links */}
           <div className="lg:col-span-3 min-w-0">
             <h5 className="font-semibold mb-5 text-yellow-400">Scan to visit CIT Website and Research Archive</h5>
-            <div className="flex items-start gap-3">
+            <div className="flex flex-col items-start gap-4 sm:flex-row">
               <div className="flex flex-col items-center">
                 <a
                   href={websiteUrl}

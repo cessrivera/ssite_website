@@ -59,7 +59,7 @@ const Announcements = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-gray-900 mb-3">Announcements</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-3">Updates</h1>
           <p className="text-gray-600 max-w-2xl mx-auto">Stay updated with the latest news, achievements, and updates from SSITE</p>
         </div>
 
@@ -73,7 +73,7 @@ const Announcements = () => {
                 </svg>
                 <input
                   type="text"
-                  placeholder="Search announcements..."
+                  placeholder="Search updates..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -107,14 +107,14 @@ const Announcements = () => {
           {loading ? (
             <div className="text-center py-20">
               <div className="w-12 h-12 border-4 border-blue-900 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-500">Loading announcements...</p>
+              <p className="text-gray-500">Loading updates...</p>
             </div>
           ) : filteredAnnouncements.length === 0 ? (
             <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-3xl">📢</span>
               </div>
-              <p className="text-gray-500 text-lg">No announcements found</p>
+              <p className="text-gray-500 text-lg">No updates found</p>
               <p className="text-gray-400 text-sm mt-1">Try adjusting your search or filter</p>
             </div>
           ) : (
@@ -175,7 +175,7 @@ const Announcements = () => {
                       onClick={() => setSelectedAnnouncement(announcement)}
                       className="inline-flex items-center gap-2 text-blue-900 font-semibold hover:text-blue-700 transition-colors group/btn"
                     >
-                      Read Full Announcement
+                      Read Full Update
                       <svg className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                       </svg>
@@ -227,7 +227,7 @@ const Announcements = () => {
 
       {/* Full Announcement Modal */}
       {selectedAnnouncement && (
-        <div 
+                <div 
           className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" 
           onClick={() => setSelectedAnnouncement(null)}
         >

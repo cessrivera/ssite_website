@@ -24,7 +24,6 @@ import AdminMembers from './pages/admin/Members';
 import AdminMessages from './pages/admin/Messages';
 import AdminSettings from './pages/admin/Settings';
 import AdminAnalytics from './pages/admin/Analytics';
-import AdminMaintenance from './pages/admin/Maintenance';
 
 function App() {
   return (
@@ -54,7 +53,6 @@ function App() {
             <Route path="messages" element={<AdminMessages />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="analytics" element={<AdminAnalytics />} />
-            <Route path="maintenance" element={<AdminMaintenance />} />
           </Route>
         </Routes>
       </Router>
