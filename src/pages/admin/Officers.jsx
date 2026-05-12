@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
-import { getOfficers, createOfficer, updateOfficer, deleteOfficer } from '../../services/officerService';
+import { getOfficers, createOfficer, updateOfficer, deleteOfficer, archiveOfficers } from '../../services/officerService';
+import { useAuth } from '../../contexts/AuthContext';
 import ImageUploader from '../../components/common/ImageUploader';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Modal from '../../components/common/Modal';
 
 const AdminOfficers = () => {
+  const { currentUser } = useAuth();
   const now = new Date();
   const currentCalendarYear = now.getFullYear();
   const currentAcademicStartYear = now.getMonth() >= 6 ? currentCalendarYear : currentCalendarYear - 1;
+  const currentTerm = `${currentAcademicStartYear}-${currentAcademicStartYear + 1}`;
   const minYear = 2020;
   const maxYear = currentCalendarYear + 6;
   const yearOptions = Array.from(
@@ -18,6 +21,10 @@ const AdminOfficers = () => {
   const [officers, setOfficers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [bulkArchiveMode, setBulkArchiveMode] = useState(false);
+  const [selectedOfficerIds, setSelectedOfficerIds] = useState([]);
+  const [archiving, setArchiving] = useState(false);
   const [editingOfficer, setEditingOfficer] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -30,7 +37,14 @@ const AdminOfficers = () => {
   });
   const [selectedStartYear, setSelectedStartYear] = useState(String(currentAcademicStartYear));
   const [selectedEndYear, setSelectedEndYear] = useState(String(currentAcademicStartYear + 1));
-  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    confirmText: 'Confirm',
+    confirmColor: 'red'
+  });
 
   const courses = ['BSIT', 'BSIS', 'BSCS', 'WMAD'];
   const years = ['1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B'];
@@ -64,6 +78,12 @@ const AdminOfficers = () => {
     };
   };
 
+  const normalizeTerm = (term) => {
+    const { startYear, endYear } = parseAcademicTerm(term);
+    if (!startYear || !endYear) return '';
+    return `${startYear}-${endYear}`;
+  };
+
   useEffect(() => {
     loadOfficers();
   }, []);
@@ -77,13 +97,62 @@ const AdminOfficers = () => {
 
   const loadOfficers = async () => {
     try {
-      const data = await getOfficers();
+      const data = await getOfficers({ includeArchived: true });
       setOfficers(data);
     } catch (error) {
       console.error('Error loading officers:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleToggleBulkArchive = () => {
+    setBulkArchiveMode((prev) => {
+      if (prev) {
+        setSelectedOfficerIds([]);
+      }
+      return !prev;
+    });
+  };
+
+  const toggleOfficerSelection = (id) => {
+    setSelectedOfficerIds((prev) =>
+      prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]
+    );
+  };
+
+  const handleArchive = (officerIds, termLabel) => {
+    if (!officerIds.length) return;
+
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Archive Officers',
+      message: `Archive ${officerIds.length} officer${officerIds.length !== 1 ? 's' : ''}${termLabel ? ` for ${termLabel}` : ''}?`,
+      confirmText: 'Archive',
+      confirmColor: 'amber',
+      onConfirm: async () => {
+        setArchiving(true);
+        try {
+          const metadata = {
+            archivedBy: currentUser?.email || 'admin',
+            archivedByUid: currentUser?.uid || null,
+            archivedTerm: termLabel || ''
+          };
+          const result = await archiveOfficers(officerIds, metadata);
+          if (!result.success) {
+            console.error('Archive failed:', result.error);
+          }
+          setSelectedOfficerIds((prev) => prev.filter((id) => !officerIds.includes(id)));
+          setBulkArchiveMode(false);
+          loadOfficers();
+        } catch (error) {
+          console.error('Error archiving officers:', error);
+        } finally {
+          setArchiving(false);
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -124,6 +193,8 @@ const AdminOfficers = () => {
       isOpen: true,
       title: 'Delete Officer',
       message: 'Are you sure you want to delete this officer? This action cannot be undone.',
+      confirmText: 'Delete',
+      confirmColor: 'red',
       onConfirm: async () => {
         try {
           await deleteOfficer(id);
@@ -158,39 +229,152 @@ const AdminOfficers = () => {
     setSelectedEndYear(String(Number(value) + 1));
   };
 
+  const activeOfficers = officers.filter((officer) => !officer.archived);
+  const visibleOfficers = showArchived ? officers : activeOfficers;
+  const currentTermOfficers = activeOfficers.filter(
+    (officer) => normalizeTerm(officer.term) === currentTerm
+  );
+  const currentTermOfficerIds = currentTermOfficers.map((officer) => officer.id);
+  const selectedOfficers = officers.filter((officer) => selectedOfficerIds.includes(officer.id));
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Manage Officers</h1>
           <p className="text-gray-500 mt-1">Add and manage organization officers</p>
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className={`px-5 py-2.5 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 ${
-            showForm 
-              ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' 
-              : 'bg-linear-to-r from-blue-600 to-blue-700 text-white hover:shadow-lg'
-          }`}
-        >
-          {showForm ? (
-            <>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Cancel
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Officer
-            </>
-          )}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleArchive(currentTermOfficerIds, currentTerm)}
+            disabled={archiving || currentTermOfficerIds.length === 0}
+            className="px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 flex items-center gap-2 bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+            Archive {currentTerm}
+          </button>
+          <button
+            type="button"
+            onClick={handleToggleBulkArchive}
+            className={`px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 flex items-center gap-2 ${
+              bulkArchiveMode
+                ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+            </svg>
+            {bulkArchiveMode ? 'Cancel Selection' : 'Bulk Archive'}
+          </button>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className={`px-5 py-2.5 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 ${
+              showForm
+                ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : 'bg-linear-to-r from-blue-600 to-blue-700 text-white hover:shadow-lg'
+            }`}
+          >
+            {showForm ? (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Cancel
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Officer
+              </>
+            )}
+          </button>
+        </div>
       </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowArchived((prev) => !prev)}
+            className="px-3 py-2 rounded-lg text-sm font-semibold bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            {showArchived ? 'Hide Archived' : 'Show Archived'}
+          </button>
+          <span className="text-sm text-gray-500">
+            {activeOfficers.length} active / {officers.length - activeOfficers.length} archived
+          </span>
+        </div>
+        {bulkArchiveMode && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-gray-500">{selectedOfficerIds.length} selected</span>
+            <button
+              type="button"
+              onClick={() => handleArchive(selectedOfficerIds, '')}
+              disabled={archiving || selectedOfficerIds.length === 0}
+              className="px-3 py-2 rounded-lg text-sm font-semibold bg-amber-600 text-white hover:bg-amber-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              Archive Selected
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedOfficerIds([])}
+              className="px-3 py-2 rounded-lg text-sm font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+      </div>
+
+      {bulkArchiveMode && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Archive Checklist</h3>
+              <p className="text-sm text-gray-500">Select officers to archive in one action.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleArchive(selectedOfficerIds, '')}
+              disabled={archiving || selectedOfficerIds.length === 0}
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-amber-600 text-white hover:bg-amber-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {`Archive Selected${selectedOfficerIds.length ? ` (${selectedOfficerIds.length})` : ''}`}
+            </button>
+          </div>
+
+          {selectedOfficers.length === 0 ? (
+            <p className="text-sm text-gray-500">Pick officers from the grid to build the archive list.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {selectedOfficers.map((officer) => (
+                <label
+                  key={officer.id}
+                  className="flex items-center gap-3 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedOfficerIds.includes(officer.id)}
+                    onChange={() => toggleOfficerSelection(officer.id)}
+                    className="h-4 w-4 text-amber-600 border-gray-300 rounded"
+                  />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{officer.name}</p>
+                    <p className="text-xs text-gray-500">{officer.position} · {normalizeTerm(officer.term)}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add/Edit Form */}
       {showForm && (
@@ -349,7 +533,7 @@ const AdminOfficers = () => {
           <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
           <p className="text-gray-500">Loading officers...</p>
         </div>
-      ) : officers.length === 0 ? (
+      ) : visibleOfficers.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -360,10 +544,25 @@ const AdminOfficers = () => {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-          {officers.map((officer) => (
-            <div key={officer.id} className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-shadow group">
+          {visibleOfficers.map((officer) => (
+            <div key={officer.id} className={`bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-shadow group ${officer.archived ? 'opacity-80' : ''}`}>
               {/* Photo */}
               <div className="w-full aspect-square bg-linear-to-br from-blue-600 to-blue-700 flex items-center justify-center relative overflow-hidden">
+                {bulkArchiveMode && !officer.archived && (
+                  <label className="absolute top-3 left-3 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-white/90 shadow-md">
+                    <input
+                      type="checkbox"
+                      checked={selectedOfficerIds.includes(officer.id)}
+                      onChange={() => toggleOfficerSelection(officer.id)}
+                      className="h-4 w-4 text-amber-600 border-gray-300 rounded"
+                    />
+                  </label>
+                )}
+                {officer.archived && (
+                  <span className="absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-900/70 text-white">
+                    Archived
+                  </span>
+                )}
                 {officer.image ? (
                   <img 
                     src={officer.image} 
@@ -382,7 +581,7 @@ const AdminOfficers = () => {
                 <h3 className="font-bold text-gray-900 text-sm truncate">{officer.name}</h3>
                 <p className="text-blue-600 text-xs font-medium">{officer.course} - {officer.year}</p>
                 <p className="text-gray-500 text-xs">{officer.position}</p>
-                <p className="text-gray-400 text-xs mt-1">{officer.term}</p>
+                <p className="text-gray-400 text-xs mt-1">{normalizeTerm(officer.term)}</p>
               </div>
 
               {/* Actions */}
@@ -411,7 +610,9 @@ const AdminOfficers = () => {
         onConfirm={confirmDialog.onConfirm}
         title={confirmDialog.title}
         message={confirmDialog.message}
-        confirmText="Delete"
+        confirmText={confirmDialog.confirmText}
+        confirmColor={confirmDialog.confirmColor}
+        loading={archiving}
       />
     </div>
   );

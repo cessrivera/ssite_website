@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { getSupportEmail } from '../services/settingsService';
 import { collection, doc, getDoc, getDocs, query, setDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
-const PRIMARY_ADMIN_EMAIL = 'admin@ssite.com';
+const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
 
 const Login = ({ defaultAdminLogin = false }) => {
@@ -17,6 +18,7 @@ const Login = ({ defaultAdminLogin = false }) => {
   const isAdminLogin = defaultAdminLogin;
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [supportEmail, setSupportEmail] = useState('');
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -29,7 +31,7 @@ const Login = ({ defaultAdminLogin = false }) => {
     setLoading(true);
 
     if (isAdminLogin && normalizeEmail(formData.email) !== PRIMARY_ADMIN_EMAIL) {
-      setError('Only admin@ssite.com is allowed for admin access.');
+      setError(`Only ${PRIMARY_ADMIN_EMAIL} is allowed for admin access.`);
       setLoading(false);
       return;
     }
@@ -108,6 +110,12 @@ const Login = ({ defaultAdminLogin = false }) => {
     }
   }, [currentUser, isAdmin, navigate]);
 
+  useEffect(() => {
+    getSupportEmail()
+      .then((email) => setSupportEmail(email))
+      .catch(() => setSupportEmail(''));
+  }, []);
+
   return (
     <div className="py-12 bg-gray-50 min-h-screen flex items-center">
       <div className="max-w-md mx-auto px-4 w-full">
@@ -143,7 +151,7 @@ const Login = ({ defaultAdminLogin = false }) => {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  placeholder="admin@ssite.com"
+                  placeholder={PRIMARY_ADMIN_EMAIL}
                   required
                   className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
@@ -206,6 +214,9 @@ const Login = ({ defaultAdminLogin = false }) => {
                   <p className="font-semibold text-amber-800 text-sm">Admin Access Only</p>
                   <p className="text-xs text-amber-700 mt-1">
                     This area is restricted to authorized administrators.
+                    {supportEmail && (
+                      <> Contact {supportEmail} for access.</>
+                    )}
                   </p>
                 </div>
               </div>

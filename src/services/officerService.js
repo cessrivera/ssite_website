@@ -7,17 +7,21 @@ import {
   getDocs, 
   query,
   orderBy,
-  Timestamp 
+  Timestamp,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 const COLLECTION = 'officers';
 
-export const getOfficers = async () => {
+export const getOfficers = async (options = {}) => {
+  const { includeArchived = true } = options;
   try {
     const q = query(collection(db, COLLECTION), orderBy('order', 'asc'));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const officers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    if (includeArchived) return officers;
+    return officers.filter((officer) => !officer.archived);
   } catch (error) {
     console.error('Error getting officers:', error);
     throw error;
@@ -28,6 +32,7 @@ export const createOfficer = async (data) => {
   try {
     const docRef = await addDoc(collection(db, COLLECTION), {
       ...data,
+      archived: false,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now()
     });
@@ -48,6 +53,31 @@ export const updateOfficer = async (id, data) => {
   } catch (error) {
     console.error('Error updating officer:', error);
     throw error;
+  }
+};
+
+export const archiveOfficers = async (officerIds = [], metadata = {}) => {
+  if (!officerIds.length) return { success: false, error: 'No officers selected.' };
+
+  try {
+    const batch = writeBatch(db);
+    const archivedAt = Timestamp.now();
+
+    officerIds.forEach((id) => {
+      const docRef = doc(db, COLLECTION, id);
+      batch.update(docRef, {
+        archived: true,
+        archivedAt,
+        ...metadata,
+        updatedAt: archivedAt
+      });
+    });
+
+    await batch.commit();
+    return { success: true };
+  } catch (error) {
+    console.error('Error archiving officers:', error);
+    return { success: false, error: error.message };
   }
 };
 

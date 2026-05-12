@@ -5,12 +5,12 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 
-const PRIMARY_ADMIN_EMAIL = 'admin@ssite.com';
+const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
 
 export const createAdminUser = async (email, password) => {
   try {
     if ((email || '').trim().toLowerCase() !== PRIMARY_ADMIN_EMAIL) {
-      return { success: false, error: 'Only admin@ssite.com can be created as admin.' };
+      return { success: false, error: `Only ${PRIMARY_ADMIN_EMAIL} can be created as admin.` };
     }
 
     // Create user in Firebase Auth
@@ -34,4 +34,4 @@ export const createAdminUser = async (email, password) => {
 };
 
 // Example usage:
-// createAdminUser('admin@ssite.com', 'YourSecurePassword123');
+// createAdminUser('pderivera.student@ua.edu.ph', 'YourSecurePassword123');

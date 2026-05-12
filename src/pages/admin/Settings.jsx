@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth, db } from '../../config/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { getSupportEmail, saveSupportEmail } from '../../services/settingsService';
 
 const AdminSettings = () => {
   const { currentUser } = useAuth();
@@ -16,10 +17,19 @@ const AdminSettings = () => {
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceLoading, setMaintenanceLoading] = useState(true);
   const [maintenanceSaving, setMaintenanceSaving] = useState(false);
+  const [supportEmail, setSupportEmail] = useState('');
+  const [supportSaving, setSupportSaving] = useState(false);
+  const [supportMessage, setSupportMessage] = useState('');
 
   useEffect(() => {
     loadMaintenanceStatus();
+    loadSupportEmail();
   }, []);
+
+  const loadSupportEmail = async () => {
+    const email = await getSupportEmail();
+    setSupportEmail(email);
+  };
 
   const loadMaintenanceStatus = async () => {
     try {
@@ -49,6 +59,20 @@ const AdminSettings = () => {
       console.error('Error toggling maintenance mode:', error);
     } finally {
       setMaintenanceSaving(false);
+    }
+  };
+
+  const handleSupportEmailSave = async () => {
+    setSupportSaving(true);
+    setSupportMessage('');
+    try {
+      await saveSupportEmail(supportEmail, currentUser?.email || 'admin');
+      setSupportMessage('Support email updated.');
+    } catch (error) {
+      console.error('Error saving support email:', error);
+      setSupportMessage('Failed to update support email.');
+    } finally {
+      setSupportSaving(false);
     }
   };
 
@@ -166,6 +190,47 @@ const AdminSettings = () => {
           )}
         </div>
 
+        {/* Support Email */}
+        <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Support Email</h2>
+              <p className="text-sm text-gray-500">Used for login help and message notifications</p>
+            </div>
+          </div>
+
+          {supportMessage && (
+            <div className={`mb-4 rounded-xl px-4 py-3 text-sm ${
+              supportMessage.includes('Failed') ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+            }`}>
+              {supportMessage}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <input
+              type="email"
+              value={supportEmail}
+              onChange={(e) => setSupportEmail(e.target.value)}
+              placeholder="pderivera.student@ua.edu.ph"
+              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            />
+            <button
+              type="button"
+              onClick={handleSupportEmailSave}
+              disabled={supportSaving}
+              className="bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60"
+            >
+              {supportSaving ? 'Saving...' : 'Save Email'}
+            </button>
+          </div>
+        </div>
+
         {/* Change Password */}
         <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
           <h2 className="text-xl font-bold mb-6">Change Password</h2>
@@ -240,7 +305,7 @@ const AdminSettings = () => {
             <div>
               <label className="block text-sm font-semibold text-gray-500 mb-1">Email</label>
               <div className="border-2 border-gray-200 rounded-xl px-4 py-3 bg-gray-50 text-gray-700">
-                {currentUser?.email || 'admin@ssite.com'}
+                {currentUser?.email || 'pderivera.student@ua.edu.ph'}
               </div>
             </div>
 

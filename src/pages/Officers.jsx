@@ -64,7 +64,7 @@ const Officers = () => {
 
   const loadOfficers = async () => {
     try {
-      const data = await getOfficers();
+      const data = await getOfficers({ includeArchived: false });
       data.sort((a, b) => (a.order || 999) - (b.order || 999));
       setOfficers(data);
     } catch (error) {

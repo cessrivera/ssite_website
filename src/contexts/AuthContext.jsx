@@ -6,12 +6,37 @@ import {
   createUserWithEmailAndPassword,
   deleteUser
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 
 const AuthContext = createContext();
-const PRIMARY_ADMIN_EMAIL = 'admin@ssite.com';
+const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
+const MEMBER_TERM_YEARS = 5;
+
+const toDateValue = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value?.toDate === 'function') return value.toDate();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const addYears = (date, years) => {
+  if (!date) return null;
+  const next = new Date(date);
+  next.setFullYear(next.getFullYear() + years);
+  return next;
+};
+
+const resolveTermDates = (data = {}) => {
+  const termStart = toDateValue(data.termStartAt) || toDateValue(data.createdAt) || new Date();
+  const termEnd = toDateValue(data.termEndAt) || addYears(termStart, MEMBER_TERM_YEARS);
+  return {
+    termStartAt: termStart,
+    termEndAt: termEnd
+  };
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -33,9 +58,24 @@ export const AuthProvider = ({ children }) => {
       const result = await signInWithEmailAndPassword(auth, email, password);
       
       // Fetch user data to check approval status
-      const userDoc = await getDoc(doc(db, 'users', result.user.uid));
+      const userRef = doc(db, 'users', result.user.uid);
+      const userDoc = await getDoc(userRef);
       if (userDoc.exists()) {
         const userData = userDoc.data();
+        const { termStartAt, termEndAt } = resolveTermDates(userData);
+        const termEndIso = termEndAt?.toISOString();
+
+        if (termEndIso && !userData.termEndAt) {
+          await updateDoc(userRef, {
+            termStartAt: termStartAt?.toISOString(),
+            termEndAt: termEndIso,
+            termYears: MEMBER_TERM_YEARS,
+            updatedAt: new Date().toISOString()
+          });
+        }
+
+        const termExpired = termEndAt ? termEndAt.getTime() <= Date.now() : false;
+
         // If user is pending approval, sign them out and return error
         if (userData.status === 'pending') {
           await signOut(auth);
@@ -50,6 +90,19 @@ export const AuthProvider = ({ children }) => {
           return { 
             success: false, 
             error: 'Your account has been deactivated. Please contact an administrator.' 
+          };
+        }
+
+        if (termExpired) {
+          await updateDoc(userRef, {
+            status: 'inactive',
+            termEndAt: termEndIso,
+            updatedAt: new Date().toISOString()
+          });
+          await signOut(auth);
+          return {
+            success: false,
+            error: 'Your membership term has expired. Please contact an administrator.'
           };
         }
       }
@@ -85,6 +138,8 @@ export const AuthProvider = ({ children }) => {
       const trimmedName = (userData?.name || '').trim();
       const trimmedYear = (userData?.year || '').trim();
       const trimmedCourse = (userData?.course || 'BSIT').trim();
+      const termStartAt = new Date();
+      const termEndAt = addYears(termStartAt, MEMBER_TERM_YEARS);
 
       if (!normalizedEmail) {
         return { success: false, error: 'Email is required.' };
@@ -95,6 +150,8 @@ export const AuthProvider = ({ children }) => {
 
       const batch = writeBatch(db);
       const createdAt = new Date().toISOString();
+      const termStartAtIso = termStartAt.toISOString();
+      const termEndAtIso = termEndAt?.toISOString();
 
       batch.set(doc(db, 'users', result.user.uid), {
         email: normalizedEmail,
@@ -104,6 +161,9 @@ export const AuthProvider = ({ children }) => {
         studentId: trimmedStudentId,
         year: trimmedYear,
         course: trimmedCourse,
+        termStartAt: termStartAtIso,
+        termEndAt: termEndAtIso,
+        termYears: MEMBER_TERM_YEARS,
         createdAt,
         status: 'pending'
       });
@@ -119,6 +179,9 @@ export const AuthProvider = ({ children }) => {
         role: 'member',
         status: 'pending',
         archived: false,
+        termStartAt: termStartAtIso,
+        termEndAt: termEndAtIso,
+        termYears: MEMBER_TERM_YEARS,
         createdAt,
         updatedAt: createdAt
       });

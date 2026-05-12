@@ -12,7 +12,7 @@ import { getMessages } from '../../services/messageService';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
-const PRIMARY_ADMIN_EMAIL = 'admin@ssite.com';
+const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
 const isPrimaryAdminUser = (user = {}) =>
   user.role === 'admin' && normalizeEmail(user.email) === PRIMARY_ADMIN_EMAIL;
@@ -101,6 +101,8 @@ const Analytics = () => {
       const readMessages = messages.filter(m => m.status === 'read').length;
 
       // Officers by term
+      const activeOfficersCount = officers.filter(o => !o.archived).length;
+      const archivedOfficersCount = officers.filter(o => o.archived).length;
       const termMap = {};
       officers.forEach(o => {
         const term = o.term || 'Unknown';
@@ -117,7 +119,7 @@ const Analytics = () => {
         { name: 'Events', total: events.length, active: upcomingEvents, inactive: pastEvents + archivedEvents },
         { name: 'Polls', total: polls.length, active: activePolls, inactive: inactivePolls },
         { name: 'Messages', total: messages.length, active: repliedMessages, inactive: unreadMessages },
-        { name: 'Officers', total: officers.length, active: officers.length, inactive: 0 },
+        { name: 'Officers', total: officers.length, active: activeOfficersCount, inactive: archivedOfficersCount },
       ];
 
       setStats({

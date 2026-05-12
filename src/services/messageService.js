@@ -1,4 +1,4 @@
-import { auth, db } from '../config/firebase';
+import { auth, db, functions } from '../config/firebase';
 import { 
   collection, 
   addDoc, 
@@ -12,10 +12,13 @@ import {
   where,
   serverTimestamp 
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { createUserNotification } from './userNotificationService';
 
 const messagesCollection = collection(db, 'messages');
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
+const sendContactMessageEmail = httpsCallable(functions, 'sendContactMessageEmail');
+const sendMessageReplyEmail = httpsCallable(functions, 'sendMessageReplyEmail');
 
 export const createMessage = async (messageData) => {
   try {
@@ -40,6 +43,12 @@ export const createMessage = async (messageData) => {
       createdAt: serverTimestamp(),
       status: 'unread'
     });
+
+    try {
+      await sendContactMessageEmail({ name, email, message });
+    } catch (emailError) {
+      console.error('Message saved but email notification failed:', emailError);
+    }
     return { success: true, id: docRef.id };
   } catch (error) {
     console.error('Error creating message:', error);
@@ -124,6 +133,23 @@ export const replyToMessage = async (messageId, replyData, originalMessage) => {
 
       if (!notificationResult.success) {
         console.error('Reply saved but notification creation failed:', notificationResult.error);
+      }
+    }
+
+    if (originalMessage) {
+      const recipientEmail = (originalMessage.senderAuthEmail || originalMessage.email || '').trim();
+      if (recipientEmail) {
+        try {
+          await sendMessageReplyEmail({
+            recipientEmail,
+            recipientName: originalMessage.name || '',
+            replyText: replyData.content,
+            originalMessage: originalMessage.message || '',
+            adminEmail: replyData.adminEmail || 'Admin'
+          });
+        } catch (emailError) {
+          console.error('Reply saved but email notification failed:', emailError);
+        }
       }
     }
 

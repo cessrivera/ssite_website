@@ -17,7 +17,7 @@ service cloud.firestore {
       return isSignedIn()
         && requesterExists()
         && requester().data.role == 'admin'
-        && requester().data.email == 'admin@ssite.com';
+        && requester().data.email == 'pderivera.student@ua.edu.ph';
     }
     
     // Allow public reads for site content
