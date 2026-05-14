@@ -1,6 +1,164 @@
+import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { doc, getDoc, getDocs, query, setDoc, where, writeBatch, collection } from 'firebase/firestore';
+import { db } from '../config/firebase';
+
+const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
+const normalizeEmail = (email = '') => email.trim().toLowerCase();
+
 const Maintenance = () => {
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const handleAdminLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    if (normalizeEmail(email) !== PRIMARY_ADMIN_EMAIL) {
+      setError(`Only ${PRIMARY_ADMIN_EMAIL} is allowed for admin access.`);
+      setLoading(false);
+      return;
+    }
+
+    const result = await login(email, password);
+    
+    if (result.success) {
+      try {
+        const userRef = doc(db, 'users', result.user.uid);
+        const userDoc = await getDoc(userRef);
+        const adminData = {
+          email: PRIMARY_ADMIN_EMAIL,
+          role: 'admin',
+          name: 'Admin User',
+          status: 'active',
+          updatedAt: new Date().toISOString()
+        };
+        
+        if (!userDoc.exists()) {
+          await setDoc(userRef, {
+            ...adminData,
+            createdAt: new Date().toISOString()
+          });
+        } else {
+          await setDoc(userRef, adminData, { merge: true });
+        }
+
+        const adminsQuery = query(collection(db, 'users'), where('role', '==', 'admin'));
+        const adminsSnapshot = await getDocs(adminsQuery);
+        const batch = writeBatch(db);
+        let hasDemotions = false;
+
+        adminsSnapshot.forEach((adminDoc) => {
+          const data = adminDoc.data();
+          const adminEmail = normalizeEmail(data.email);
+          if (adminEmail !== PRIMARY_ADMIN_EMAIL) {
+            batch.update(adminDoc.ref, {
+              role: 'member',
+              updatedAt: new Date().toISOString()
+            });
+            hasDemotions = true;
+          }
+        });
+
+        if (hasDemotions) {
+          await batch.commit();
+        }
+        
+        window.location.href = '/admin';
+      } catch (err) {
+        console.error('Error verifying admin status:', err);
+        setError('Error verifying admin status. Please try again.');
+        setLoading(false);
+      }
+    } else {
+      setError(result.error || 'Failed to login. Please check your credentials.');
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 flex items-center justify-center p-4">
+      {/* Admin Login Button - Top Right */}
+      <button
+        onClick={() => setShowLoginModal(true)}
+        className="absolute top-6 right-6 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg border border-white/20 transition-colors font-medium text-sm"
+      >
+        Admin Login
+      </button>
+
+      {/* Admin Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Admin Login</h2>
+              <button
+                onClick={() => {
+                  setShowLoginModal(false);
+                  setEmail('');
+                  setPassword('');
+                  setError('');
+                }}
+                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleAdminLogin} className="space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                  {error}
+                </div>
+              )}
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                  placeholder="Enter your email"
+                  disabled={loading}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                  placeholder="Enter your password"
+                  disabled={loading}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition-colors"
+              >
+                {loading ? 'Logging in...' : 'Login'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-lg w-full text-center">
         {/* Gear Icon Animation */}
         <div className="relative w-32 h-32 mx-auto mb-8">
