@@ -13,6 +13,12 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
+    function isAdmin() {
+      return isSignedIn()
+        && requesterExists()
+        && requester().data.role == 'admin';
+    }
+
     function isPrimaryAdmin() {
       return isSignedIn()
         && requesterExists()
@@ -144,7 +150,7 @@ service cloud.firestore {
 
     match /settings/{document=**} {
       allow read: if true;
-      allow write: if isPrimaryAdmin();
+      allow write: if isAdmin();
     }
   }
 }
