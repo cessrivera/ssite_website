@@ -21,12 +21,6 @@ const Maintenance = () => {
     setError('');
     setLoading(true);
 
-    if (normalizeEmail(email) !== PRIMARY_ADMIN_EMAIL) {
-      setError(`Only ${PRIMARY_ADMIN_EMAIL} is allowed for admin access.`);
-      setLoading(false);
-      return;
-    }
-
     const result = await login(email, password);
     
     if (result.success) {
