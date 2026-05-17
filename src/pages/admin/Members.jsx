@@ -63,6 +63,11 @@ const AdminMembers = () => {
   });
   const [saving, setSaving] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+  const [selectedMembers, setSelectedMembers] = useState({
+    pending: [],
+    active: [],
+    inactive: []
+  });
 
   useEffect(() => {
     loadMembers();
@@ -191,6 +196,57 @@ const AdminMembers = () => {
     } catch (error) {
       console.error('Error approving member:', error);
     }
+  };
+
+  const clearSelection = (section) => {
+    setSelectedMembers(prev => ({ ...prev, [section]: [] }));
+  };
+
+  const toggleMemberSelection = (section, memberId) => {
+    setSelectedMembers(prev => {
+      const selected = prev[section] || [];
+      return {
+        ...prev,
+        [section]: selected.includes(memberId)
+          ? selected.filter(id => id !== memberId)
+          : [...selected, memberId]
+      };
+    });
+  };
+
+  const toggleAllMembers = (section, list) => {
+    setSelectedMembers(prev => {
+      const selected = prev[section] || [];
+      const ids = list.map(member => member.id);
+      const allSelected = ids.length > 0 && ids.every(id => selected.includes(id));
+      return {
+        ...prev,
+        [section]: allSelected ? [] : ids
+      };
+    });
+  };
+
+  const runBulkAction = (section, list, action, { title, message }) => {
+    const selectedIds = selectedMembers[section] || [];
+    const selectedList = list.filter(member => selectedIds.includes(member.id));
+    if (selectedList.length === 0) return;
+
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      message: `${message} (${selectedList.length} selected)`,
+      onConfirm: async () => {
+        try {
+          await Promise.all(selectedList.map(action));
+          clearSelection(section);
+          loadMembers();
+        } catch (error) {
+          console.error('Error running bulk member action:', error);
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
   const handleReject = (member) => {
@@ -335,6 +391,10 @@ const AdminMembers = () => {
     return 'bg-blue-100 text-blue-700';
   };
 
+  const pendingSelected = selectedMembers.pending.length;
+  const activeSelected = selectedMembers.active.length;
+  const inactiveSelected = selectedMembers.inactive.length;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -427,7 +487,32 @@ const AdminMembers = () => {
               <p className="text-sm text-gray-500">{pendingMembersList.length} member{pendingMembersList.length !== 1 ? 's' : ''} waiting for approval</p>
             </div>
             </div>
-            <div className="relative w-full md:w-72">
+            <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={pendingSelected === 0}
+                  onClick={() => runBulkAction('pending', pendingMembersList, member => updateMemberRecords(member, { status: 'active', updatedAt: new Date().toISOString() }), {
+                    title: 'Approve Selected Members',
+                    message: 'Approve selected pending members?'
+                  })}
+                  className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                >
+                  Approve Selected
+                </button>
+                <button
+                  type="button"
+                  disabled={pendingSelected === 0}
+                  onClick={() => runBulkAction('pending', pendingMembersList, deleteMemberRecords, {
+                    title: 'Reject Selected Members',
+                    message: 'Reject selected pending members? This cannot be undone.'
+                  })}
+                  className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                >
+                  Reject Selected
+                </button>
+              </div>
+              <div className="relative w-full md:w-72">
               <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -438,6 +523,7 @@ const AdminMembers = () => {
                 onChange={(e) => setPendingSearch(e.target.value)}
                 className="w-full border border-amber-200 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white"
               />
+              </div>
             </div>
           </div>
         </div>
@@ -460,6 +546,15 @@ const AdminMembers = () => {
           <table className="w-full">
             <thead className="bg-gradient-to-r from-amber-500 to-amber-600">
               <tr>
+                <th className="text-left py-4 px-6 font-semibold text-white">
+                  <input
+                    type="checkbox"
+                    checked={pendingMembersList.length > 0 && pendingMembersList.every(member => selectedMembers.pending.includes(member.id))}
+                    onChange={() => toggleAllMembers('pending', pendingMembersList)}
+                    className="h-4 w-4 rounded border-white/60 text-amber-700"
+                    aria-label="Select all pending members"
+                  />
+                </th>
                 <th className="text-left py-4 px-6 font-semibold text-white">Student #</th>
                 <th className="text-left py-4 px-6 font-semibold text-white">Name</th>
                 <th className="text-left py-4 px-6 font-semibold text-white">Course</th>
@@ -471,6 +566,15 @@ const AdminMembers = () => {
             <tbody>
               {pendingMembersList.map((member, index) => (
                 <tr key={member.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-amber-50/30'} hover:bg-amber-50 transition-colors`}>
+                  <td className="py-4 px-6">
+                    <input
+                      type="checkbox"
+                      checked={selectedMembers.pending.includes(member.id)}
+                      onChange={() => toggleMemberSelection('pending', member.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-amber-600"
+                      aria-label={`Select ${member.name || 'member'}`}
+                    />
+                  </td>
                   <td className="py-4 px-6 text-gray-600 font-medium">
                     {member.studentId || 'N/A'}
                   </td>
@@ -531,7 +635,32 @@ const AdminMembers = () => {
               <p className="text-sm text-gray-500">{activeMembersList.length} approved member{activeMembersList.length !== 1 ? 's' : ''}</p>
             </div>
             </div>
-            <div className="relative w-full md:w-72">
+            <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={activeSelected === 0}
+                  onClick={() => {
+                    const member = activeMembersList.find(item => item.id === selectedMembers.active[0]);
+                    if (member) handleEditClick(member);
+                  }}
+                  className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                >
+                  Edit Selected
+                </button>
+                <button
+                  type="button"
+                  disabled={activeSelected === 0}
+                  onClick={() => runBulkAction('active', activeMembersList, deleteMemberRecords, {
+                    title: 'Delete Selected Members',
+                    message: 'Delete selected active members? This cannot be undone.'
+                  })}
+                  className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                >
+                  Delete Selected
+                </button>
+              </div>
+              <div className="relative w-full md:w-72">
               <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -542,6 +671,7 @@ const AdminMembers = () => {
                 onChange={(e) => setActiveSearch(e.target.value)}
                 className="w-full border border-blue-200 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white"
               />
+              </div>
             </div>
           </div>
         </div>
@@ -564,6 +694,15 @@ const AdminMembers = () => {
           <table className="w-full">
             <thead className="bg-gradient-to-r from-blue-600 to-blue-700">
               <tr>
+                <th className="text-left py-4 px-6 font-semibold text-white">
+                  <input
+                    type="checkbox"
+                    checked={activeMembersList.length > 0 && activeMembersList.every(member => selectedMembers.active.includes(member.id))}
+                    onChange={() => toggleAllMembers('active', activeMembersList)}
+                    className="h-4 w-4 rounded border-white/60 text-blue-700"
+                    aria-label="Select all active members"
+                  />
+                </th>
                 <th className="text-left py-4 px-6 font-semibold text-white">Student #</th>
                 <th className="text-left py-4 px-6 font-semibold text-white">Name</th>
                 <th className="text-left py-4 px-6 font-semibold text-white">Course</th>
@@ -576,6 +715,15 @@ const AdminMembers = () => {
             <tbody>
               {activeMembersList.map((member, index) => (
                 <tr key={member.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} hover:bg-blue-50/50 transition-colors`}>
+                  <td className="py-4 px-6">
+                    <input
+                      type="checkbox"
+                      checked={selectedMembers.active.includes(member.id)}
+                      onChange={() => toggleMemberSelection('active', member.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                      aria-label={`Select ${member.name || 'member'}`}
+                    />
+                  </td>
                   <td className="py-4 px-6 text-gray-600 font-medium">
                     {member.studentId || 'N/A'}
                   </td>
@@ -641,7 +789,32 @@ const AdminMembers = () => {
                 <p className="text-sm text-gray-500">{inactiveMembersList.length} inactive member{inactiveMembersList.length !== 1 ? 's' : ''}</p>
               </div>
             </div>
-            <div className="relative w-full md:w-72">
+            <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={inactiveSelected === 0}
+                  onClick={() => runBulkAction('inactive', inactiveMembersList, member => updateMemberRecords(member, { status: 'active', updatedAt: new Date().toISOString() }), {
+                    title: 'Activate Selected Members',
+                    message: 'Activate selected inactive members?'
+                  })}
+                  className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                >
+                  Activate Selected
+                </button>
+                <button
+                  type="button"
+                  disabled={inactiveSelected === 0}
+                  onClick={() => runBulkAction('inactive', inactiveMembersList, deleteMemberRecords, {
+                    title: 'Delete Selected Members',
+                    message: 'Delete selected inactive members? This cannot be undone.'
+                  })}
+                  className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                >
+                  Delete Selected
+                </button>
+              </div>
+              <div className="relative w-full md:w-72">
               <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -652,6 +825,7 @@ const AdminMembers = () => {
                 onChange={(e) => setInactiveSearch(e.target.value)}
                 className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent bg-white"
               />
+              </div>
             </div>
           </div>
         </div>
@@ -674,6 +848,15 @@ const AdminMembers = () => {
           <table className="w-full">
             <thead className="bg-gradient-to-r from-slate-600 to-slate-700">
               <tr>
+                <th className="text-left py-4 px-6 font-semibold text-white">
+                  <input
+                    type="checkbox"
+                    checked={inactiveMembersList.length > 0 && inactiveMembersList.every(member => selectedMembers.inactive.includes(member.id))}
+                    onChange={() => toggleAllMembers('inactive', inactiveMembersList)}
+                    className="h-4 w-4 rounded border-white/60 text-slate-700"
+                    aria-label="Select all inactive members"
+                  />
+                </th>
                 <th className="text-left py-4 px-6 font-semibold text-white">Student #</th>
                 <th className="text-left py-4 px-6 font-semibold text-white">Name</th>
                 <th className="text-left py-4 px-6 font-semibold text-white">Course</th>
@@ -685,6 +868,15 @@ const AdminMembers = () => {
             <tbody>
               {inactiveMembersList.map((member, index) => (
                 <tr key={member.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} hover:bg-slate-50 transition-colors`}>
+                  <td className="py-4 px-6">
+                    <input
+                      type="checkbox"
+                      checked={selectedMembers.inactive.includes(member.id)}
+                      onChange={() => toggleMemberSelection('inactive', member.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-slate-600"
+                      aria-label={`Select ${member.name || 'member'}`}
+                    />
+                  </td>
                   <td className="py-4 px-6 text-gray-600 font-medium">{member.studentId || 'N/A'}</td>
                   <td className="py-4 px-6">
                     <div>

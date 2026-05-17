@@ -58,6 +58,30 @@ export const getPolls = async () => {
   }
 };
 
+export const getPollVoteDetails = async (pollId) => {
+  try {
+    const votesSnapshot = await getDocs(collection(db, 'pollVotes'));
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const usersById = new Map(usersSnapshot.docs.map((userDoc) => [userDoc.id, userDoc.data()]));
+
+    return votesSnapshot.docs
+      .map((voteDoc) => ({ id: voteDoc.id, ...voteDoc.data() }))
+      .filter((vote) => vote.pollId === pollId)
+      .map((vote) => {
+        const user = usersById.get(vote.userId) || {};
+        return {
+          ...vote,
+          voterName: user.fullName || user.name || vote.name || 'Unknown member',
+          voterEmail: user.email || vote.email || 'N/A',
+          studentId: user.studentId || vote.studentId || 'N/A',
+        };
+      });
+  } catch (error) {
+    console.error('Error getting poll vote details:', error);
+    throw error;
+  }
+};
+
 export const createPoll = async (data) => {
   try {
     const docRef = await addDoc(collection(db, COLLECTION), {

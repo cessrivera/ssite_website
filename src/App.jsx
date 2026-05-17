@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/layout/Layout';
-import { AdminRoute } from './components/auth/ProtectedRoute';
+import { AdminRoute, PermissionRoute } from './components/auth/ProtectedRoute';
 import AdminLayout from './components/admin/AdminLayout';
 import MaintenanceGate from './components/common/MaintenanceGate';
 
@@ -21,6 +21,7 @@ import AdminEvents from './pages/admin/Events';
 import AdminOfficers from './pages/admin/Officers';
 import AdminPolls from './pages/admin/Polls';
 import AdminMembers from './pages/admin/Members';
+import AdminRolesPermissions from './pages/admin/RolesPermissions';
 import AdminMessages from './pages/admin/Messages';
 import AdminSettings from './pages/admin/Settings';
 import AdminAnalytics from './pages/admin/Analytics';
@@ -44,15 +45,16 @@ function App() {
 
           {/* Admin Routes - never blocked by maintenance */}
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="announcements" element={<AdminAnnouncements />} />
-            <Route path="events" element={<AdminEvents />} />
-            <Route path="officers" element={<AdminOfficers />} />
-            <Route path="polls" element={<AdminPolls />} />
-            <Route path="members" element={<AdminMembers />} />
-            <Route path="messages" element={<AdminMessages />} />
-            <Route path="settings" element={<AdminSettings />} />
-            <Route path="analytics" element={<AdminAnalytics />} />
+            <Route index element={<PermissionRoute adminOnly><AdminDashboard /></PermissionRoute>} />
+            <Route path="announcements" element={<PermissionRoute permission="announcements"><AdminAnnouncements /></PermissionRoute>} />
+            <Route path="events" element={<PermissionRoute permission="events"><AdminEvents /></PermissionRoute>} />
+            <Route path="officers" element={<PermissionRoute permission="officers"><AdminOfficers /></PermissionRoute>} />
+            <Route path="polls" element={<PermissionRoute permission="polls"><AdminPolls /></PermissionRoute>} />
+            <Route path="members" element={<PermissionRoute adminOnly><AdminMembers /></PermissionRoute>} />
+            <Route path="roles-permissions" element={<PermissionRoute adminOnly><AdminRolesPermissions /></PermissionRoute>} />
+            <Route path="messages" element={<PermissionRoute adminOnly><AdminMessages /></PermissionRoute>} />
+            <Route path="settings" element={<PermissionRoute adminOnly><AdminSettings /></PermissionRoute>} />
+            <Route path="analytics" element={<PermissionRoute adminOnly><AdminAnalytics /></PermissionRoute>} />
           </Route>
         </Routes>
       </Router>

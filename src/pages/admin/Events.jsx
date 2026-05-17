@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getEvents, createEvent, updateEvent, deleteEvent, archiveEvent, unarchiveEvent } from '../../services/eventService';
+import { getEventRegistrations } from '../../services/eventRegistrationService';
 import ImageUploader from '../../components/common/ImageUploader';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Modal from '../../components/common/Modal';
@@ -37,6 +38,9 @@ const AdminEvents = () => {
   });
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const [showArchived, setShowArchived] = useState(false);
+  const [registrationEvent, setRegistrationEvent] = useState(null);
+  const [registrations, setRegistrations] = useState([]);
+  const [registrationsLoading, setRegistrationsLoading] = useState(false);
 
   useEffect(() => {
     loadEvents();
@@ -123,6 +127,21 @@ const AdminEvents = () => {
       loadEvents();
     } catch (error) {
       console.error('Error unarchiving event:', error);
+    }
+  };
+
+  const handleViewRegistrations = async (event) => {
+    setRegistrationEvent(event);
+    setRegistrations([]);
+    setRegistrationsLoading(true);
+    try {
+      const data = await getEventRegistrations(event.id);
+      setRegistrations(data);
+    } catch (error) {
+      console.error('Error loading event registrations:', error);
+      setRegistrations([]);
+    } finally {
+      setRegistrationsLoading(false);
     }
   };
 
@@ -372,6 +391,15 @@ const AdminEvents = () => {
                         Edit
                       </button>
                       <button
+                        onClick={() => handleViewRegistrations(event)}
+                        className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-200 transition-colors flex items-center gap-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2zm4-5h6" />
+                        </svg>
+                        Registrants
+                      </button>
+                      <button
                         onClick={() => handleArchive(event.id)}
                         className="bg-amber-100 text-amber-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-200 transition-colors flex items-center gap-1"
                       >
@@ -388,6 +416,46 @@ const AdminEvents = () => {
           ))}
         </div>
       )}
+
+      <Modal
+        isOpen={!!registrationEvent}
+        onClose={() => {
+          setRegistrationEvent(null);
+          setRegistrations([]);
+        }}
+        title={registrationEvent ? `Registrants: ${registrationEvent.title}` : 'Registrants'}
+        size="2xl"
+      >
+        {registrationsLoading ? (
+          <div className="text-center py-10">
+            <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+            <p className="text-gray-500">Loading registrants...</p>
+          </div>
+        ) : registrations.length === 0 ? (
+          <p className="text-center py-10 text-gray-500">No members registered for this event yet.</p>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-gray-200">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Student #</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {registrations.map((registration) => (
+                  <tr key={registration.id}>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{registration.userName || registration.name || 'Unknown member'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{registration.userEmail || registration.email || 'N/A'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{registration.studentId || 'N/A'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Modal>
 
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}

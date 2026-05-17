@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getPolls, createPoll, updatePoll, deletePoll } from '../../services/pollService';
+import { getPolls, createPoll, updatePoll, deletePoll, getPollVoteDetails } from '../../services/pollService';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Modal from '../../components/common/Modal';
 
@@ -8,6 +8,7 @@ const AdminPolls = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showResults, setShowResults] = useState(null);
+  const [voteDetails, setVoteDetails] = useState([]);
   const [editingPoll, setEditingPoll] = useState(null);
   const [formData, setFormData] = useState({
     question: '',
@@ -100,6 +101,17 @@ const AdminPolls = () => {
       loadPolls();
     } catch (error) {
       console.error('Error updating poll:', error);
+    }
+  };
+
+  const handleShowResults = async (poll) => {
+    setShowResults(poll);
+    try {
+      const details = await getPollVoteDetails(poll.id);
+      setVoteDetails(details);
+    } catch (error) {
+      console.error('Error loading vote details:', error);
+      setVoteDetails([]);
     }
   };
 
@@ -219,7 +231,10 @@ const AdminPolls = () => {
                 <h2 className="text-2xl font-bold text-gray-900">Poll Results</h2>
               </div>
               <button
-                onClick={() => setShowResults(null)}
+                onClick={() => {
+                  setShowResults(null);
+                  setVoteDetails([]);
+                }}
                 className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
               >
                 <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -264,8 +279,34 @@ const AdminPolls = () => {
                 </div>
               </div>
 
+              <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <h4 className="font-semibold text-gray-900">Members Who Voted</h4>
+                </div>
+                {voteDetails.length === 0 ? (
+                  <p className="px-4 py-4 text-sm text-gray-500">No votes submitted yet.</p>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {voteDetails.map((vote) => (
+                      <div key={vote.id} className="px-4 py-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="font-medium text-gray-900">{vote.voterName}</p>
+                          <p className="text-xs text-gray-500">{vote.voterEmail} - {vote.studentId}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-blue-700">
+                          {showResults.options?.[vote.optionIndex]?.text || 'Unknown option'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <button
-                onClick={() => setShowResults(null)}
+                onClick={() => {
+                  setShowResults(null);
+                  setVoteDetails([]);
+                }}
                 className="w-full bg-gradient-to-r from-blue-900 to-blue-700 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200"
               >
                 Close
@@ -342,7 +383,7 @@ const AdminPolls = () => {
 
                   <div className="flex flex-wrap gap-2">
                     <button
-                      onClick={() => setShowResults(poll)}
+                      onClick={() => handleShowResults(poll)}
                       className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-100 transition-colors text-sm flex items-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -424,7 +465,7 @@ const AdminPolls = () => {
 
                   <div className="flex flex-wrap gap-2">
                     <button
-                      onClick={() => setShowResults(poll)}
+                      onClick={() => handleShowResults(poll)}
                       className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-100 transition-colors text-sm flex items-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
