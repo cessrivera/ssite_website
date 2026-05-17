@@ -51,11 +51,11 @@ const AdminDashboard = () => {
       // Build recent activity from data
       const activities = [];
       
-      // Add recent announcements
+      // Add recent updates
       announcements.slice(0, 2).forEach(a => {
         activities.push({
           type: 'announcement',
-          message: 'Announcement published',
+          message: 'Update published',
           detail: a.title,
           time: a.createdAt ? formatTimeAgo(a.createdAt.toDate?.() || new Date(a.createdAt)) : 'Recently',
           icon: '📢'
@@ -94,7 +94,7 @@ const AdminDashboard = () => {
   };
 
   const quickActions = [
-    { label: 'Add Announcement', path: '/admin/announcements', icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', color: 'from-blue-900 via-blue-800 to-blue-900' },
+    { label: 'Add Update', path: '/admin/announcements', icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', color: 'from-blue-900 via-blue-800 to-blue-900' },
     { label: 'Add Event', path: '/admin/events', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', color: 'from-blue-900 via-blue-800 to-blue-900' },
     { label: 'Add Officer', path: '/admin/officers', icon: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z', color: 'from-blue-900 via-blue-800 to-blue-900' },
     { label: 'Create Poll', path: '/admin/polls', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', color: 'from-blue-900 via-blue-800 to-blue-900' },
@@ -134,8 +134,8 @@ const AdminDashboard = () => {
             </div>
             <div className="text-right">
               <div className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.announcements}</div>
-              <div className="text-gray-500 text-sm font-medium">Announcements</div>
-              <div className="text-blue-600 text-xs mt-1">{stats.announcements} published</div>
+              <div className="text-gray-500 text-sm font-medium">Updates</div>
+              <div className="text-blue-600 text-xs mt-1">{stats.announcements} updates published</div>
             </div>
           </div>
         </div>

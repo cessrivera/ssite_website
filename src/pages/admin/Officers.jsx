@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react';
-import { getOfficers, createOfficer, updateOfficer, deleteOfficer, archiveOfficers } from '../../services/officerService';
+import {
+  getOfficers,
+  createOfficer,
+  createOfficers,
+  updateOfficer,
+  deleteOfficer,
+  archiveOfficers,
+  unarchiveOfficers
+} from '../../services/officerService';
 import { useAuth } from '../../contexts/AuthContext';
 import ImageUploader from '../../components/common/ImageUploader';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
@@ -22,9 +30,13 @@ const AdminOfficers = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [bulkArchiveMode, setBulkArchiveMode] = useState(false);
+  const [bulkImportText, setBulkImportText] = useState('');
   const [selectedOfficerIds, setSelectedOfficerIds] = useState([]);
   const [archiving, setArchiving] = useState(false);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [selectedTermFilter, setSelectedTermFilter] = useState('all');
   const [editingOfficer, setEditingOfficer] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -82,6 +94,32 @@ const AdminOfficers = () => {
     const { startYear, endYear } = parseAcademicTerm(term);
     if (!startYear || !endYear) return '';
     return `${startYear}-${endYear}`;
+  };
+
+  const parseBulkOfficerRows = (text) => {
+    const rows = text
+      .split(/\r?\n/)
+      .map((row) => row.trim())
+      .filter(Boolean);
+
+    const parsedRows = rows.map((row, index) => {
+      const columns = row.includes('\t') ? row.split('\t') : row.split(',');
+      const [name, position, course = 'BSIT', year = '', term = currentTerm, image = '', order = index + 1] = columns.map((value) => value.trim());
+      if (index === 0 && name.toLowerCase() === 'name' && position.toLowerCase() === 'position') {
+        return null;
+      }
+      return {
+        name,
+        position,
+        course: course || 'BSIT',
+        year,
+        term: normalizeTerm(term || currentTerm),
+        image,
+        order: Number.parseInt(order, 10) || index + 1
+      };
+    });
+
+    return parsedRows.filter((officer) => officer?.name && officer?.position);
   };
 
   useEffect(() => {
@@ -153,6 +191,55 @@ const AdminOfficers = () => {
         }
       }
     });
+  };
+
+  const handleRestore = (officerIds) => {
+    if (!officerIds.length) return;
+
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Restore Officers',
+      message: `Restore ${officerIds.length} officer${officerIds.length !== 1 ? 's' : ''} to the active list?`,
+      confirmText: 'Restore',
+      confirmColor: 'emerald',
+      onConfirm: async () => {
+        setArchiving(true);
+        try {
+          const result = await unarchiveOfficers(officerIds);
+          if (!result.success) {
+            console.error('Restore failed:', result.error);
+          }
+          setSelectedOfficerIds((prev) => prev.filter((id) => !officerIds.includes(id)));
+          loadOfficers();
+        } catch (error) {
+          console.error('Error restoring officers:', error);
+        } finally {
+          setArchiving(false);
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  const handleBulkImport = async (event) => {
+    event.preventDefault();
+    const parsedOfficers = parseBulkOfficerRows(bulkImportText);
+    if (!parsedOfficers.length) return;
+
+    setBulkImporting(true);
+    try {
+      const result = await createOfficers(parsedOfficers);
+      if (!result.success) {
+        console.error('Bulk officer import failed:', result.error);
+      }
+      setBulkImportText('');
+      setShowBulkImport(false);
+      loadOfficers();
+    } catch (error) {
+      console.error('Error importing officers:', error);
+    } finally {
+      setBulkImporting(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -230,12 +317,18 @@ const AdminOfficers = () => {
   };
 
   const activeOfficers = officers.filter((officer) => !officer.archived);
-  const visibleOfficers = showArchived ? officers : activeOfficers;
+  const termOptions = [...new Set(officers.map((officer) => normalizeTerm(officer.term)).filter(Boolean))]
+    .sort((a, b) => b.localeCompare(a));
+  const baseVisibleOfficers = showArchived ? officers : activeOfficers;
+  const visibleOfficers = selectedTermFilter === 'all'
+    ? baseVisibleOfficers
+    : baseVisibleOfficers.filter((officer) => normalizeTerm(officer.term) === selectedTermFilter);
   const currentTermOfficers = activeOfficers.filter(
     (officer) => normalizeTerm(officer.term) === currentTerm
   );
   const currentTermOfficerIds = currentTermOfficers.map((officer) => officer.id);
   const selectedOfficers = officers.filter((officer) => selectedOfficerIds.includes(officer.id));
+  const selectedBulkPreview = parseBulkOfficerRows(bulkImportText);
 
   return (
     <div className="space-y-6">
@@ -246,6 +339,16 @@ const AdminOfficers = () => {
           <p className="text-gray-500 mt-1">Add and manage organization officers</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowBulkImport(true)}
+            className="px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 flex items-center gap-2 bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0-12l4 4m-4-4L8 8" />
+            </svg>
+            Bulk Add
+          </button>
           <button
             type="button"
             onClick={() => handleArchive(currentTermOfficerIds, currentTerm)}
@@ -299,7 +402,7 @@ const AdminOfficers = () => {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={() => setShowArchived((prev) => !prev)}
@@ -310,6 +413,18 @@ const AdminOfficers = () => {
           <span className="text-sm text-gray-500">
             {activeOfficers.length} active / {officers.length - activeOfficers.length} archived
           </span>
+          <div className="relative">
+            <select
+              value={selectedTermFilter}
+              onChange={(event) => setSelectedTermFilter(event.target.value)}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-2 pr-8 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All terms</option>
+              {termOptions.map((term) => (
+                <option key={term} value={term}>{term}</option>
+              ))}
+            </select>
+          </div>
         </div>
         {bulkArchiveMode && (
           <div className="flex flex-wrap items-center gap-2">
@@ -527,6 +642,61 @@ const AdminOfficers = () => {
         </Modal>
       )}
 
+      <Modal
+        isOpen={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        title="Bulk Add Officers"
+        size="3xl"
+        backdropClassName="bg-linear-to-br from-blue-100/70 via-white/70 to-slate-100/75 backdrop-blur-[2px]"
+      >
+        <form onSubmit={handleBulkImport} className="space-y-5">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Paste rows from Google Sheets</label>
+            <textarea
+              value={bulkImportText}
+              onChange={(event) => setBulkImportText(event.target.value)}
+              placeholder="Name, Position, Course, Year, Term, Image URL, Order"
+              rows={8}
+              className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="mt-2 text-xs text-gray-500">
+              Accepted columns: name, position, course, year, term, image URL, order. Commas or pasted spreadsheet tabs both work.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <p className="text-sm font-semibold text-gray-900">{selectedBulkPreview.length} valid officer{selectedBulkPreview.length === 1 ? '' : 's'} ready to import</p>
+            {selectedBulkPreview.length > 0 && (
+              <div className="mt-3 max-h-40 overflow-y-auto divide-y divide-gray-200 rounded-lg bg-white">
+                {selectedBulkPreview.slice(0, 8).map((officer, index) => (
+                  <div key={`${officer.name}-${index}`} className="px-3 py-2 text-sm">
+                    <span className="font-semibold text-gray-900">{officer.name}</span>
+                    <span className="text-gray-500"> - {officer.position} ({officer.term})</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={bulkImporting || selectedBulkPreview.length === 0}
+              className="bg-linear-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 disabled:from-gray-300 disabled:to-gray-300"
+            >
+              {bulkImporting ? 'Importing...' : `Import ${selectedBulkPreview.length || ''} Officers`}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowBulkImport(false)}
+              className="border-2 border-gray-200 px-6 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors text-gray-600"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </Modal>
+
       {/* Officers Grid */}
       {loading ? (
         <div className="text-center py-16">
@@ -586,12 +756,21 @@ const AdminOfficers = () => {
 
               {/* Actions */}
               <div className="px-4 pb-4 flex gap-2 justify-center">
-                <button
-                  onClick={() => handleEdit(officer)}
-                  className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-xs font-medium hover:bg-blue-200 transition-colors flex-1"
-                >
-                  Edit
-                </button>
+                {officer.archived ? (
+                  <button
+                    onClick={() => handleRestore([officer.id])}
+                    className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-lg text-xs font-medium hover:bg-emerald-200 transition-colors flex-1"
+                  >
+                    Restore
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleEdit(officer)}
+                    className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-xs font-medium hover:bg-blue-200 transition-colors flex-1"
+                  >
+                    Edit
+                  </button>
+                )}
                 <button
                   onClick={() => handleDelete(officer.id)}
                   className="bg-red-100 text-red-700 px-4 py-2 rounded-lg text-xs font-medium hover:bg-red-200 transition-colors flex-1"

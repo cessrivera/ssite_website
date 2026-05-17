@@ -5,16 +5,17 @@ const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, message, confirmText
     red: 'from-red-600 to-red-700',
     blue: 'from-blue-600 to-blue-700',
     amber: 'from-amber-500 to-amber-600',
+    emerald: 'from-emerald-600 to-emerald-700',
   };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
       <div className="text-center">
         <div className={`w-14 h-14 mx-auto mb-4 rounded-full flex items-center justify-center ${
-          confirmColor === 'red' ? 'bg-red-100' : confirmColor === 'amber' ? 'bg-amber-100' : 'bg-blue-100'
+          confirmColor === 'red' ? 'bg-red-100' : confirmColor === 'amber' ? 'bg-amber-100' : confirmColor === 'emerald' ? 'bg-emerald-100' : 'bg-blue-100'
         }`}>
           <svg className={`w-7 h-7 ${
-            confirmColor === 'red' ? 'text-red-600' : confirmColor === 'amber' ? 'text-amber-600' : 'text-blue-600'
+            confirmColor === 'red' ? 'text-red-600' : confirmColor === 'amber' ? 'text-amber-600' : confirmColor === 'emerald' ? 'text-emerald-600' : 'text-blue-600'
           }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>

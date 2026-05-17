@@ -43,6 +43,31 @@ export const createOfficer = async (data) => {
   }
 };
 
+export const createOfficers = async (officers = []) => {
+  if (!officers.length) return { success: false, error: 'No officers to import.' };
+
+  try {
+    const batch = writeBatch(db);
+    const now = Timestamp.now();
+
+    officers.forEach((officer) => {
+      const docRef = doc(collection(db, COLLECTION));
+      batch.set(docRef, {
+        ...officer,
+        archived: false,
+        createdAt: now,
+        updatedAt: now
+      });
+    });
+
+    await batch.commit();
+    return { success: true };
+  } catch (error) {
+    console.error('Error creating officers:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 export const updateOfficer = async (id, data) => {
   try {
     const docRef = doc(db, COLLECTION, id);
@@ -77,6 +102,34 @@ export const archiveOfficers = async (officerIds = [], metadata = {}) => {
     return { success: true };
   } catch (error) {
     console.error('Error archiving officers:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const unarchiveOfficers = async (officerIds = []) => {
+  if (!officerIds.length) return { success: false, error: 'No officers selected.' };
+
+  try {
+    const batch = writeBatch(db);
+    const restoredAt = Timestamp.now();
+
+    officerIds.forEach((id) => {
+      const docRef = doc(db, COLLECTION, id);
+      batch.update(docRef, {
+        archived: false,
+        archivedAt: null,
+        archivedBy: '',
+        archivedByUid: null,
+        archivedTerm: '',
+        restoredAt,
+        updatedAt: restoredAt
+      });
+    });
+
+    await batch.commit();
+    return { success: true };
+  } catch (error) {
+    console.error('Error restoring officers:', error);
     return { success: false, error: error.message };
   }
 };

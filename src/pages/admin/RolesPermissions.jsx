@@ -4,13 +4,63 @@ import { db } from '../../config/firebase';
 
 const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
+const MEMBER_TERM_YEARS = 5;
+
+const toDateValue = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value?.toDate === 'function') return value.toDate();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const addYears = (date, years) => {
+  if (!date) return null;
+  const next = new Date(date);
+  next.setFullYear(next.getFullYear() + years);
+  return next;
+};
+
+const resolveTermDates = (member = {}) => {
+  const termStartAt = toDateValue(member.termStartAt) || toDateValue(member.createdAt) || new Date();
+  const termEndAt = toDateValue(member.termEndAt) || addYears(termStartAt, MEMBER_TERM_YEARS);
+  return { termStartAt, termEndAt };
+};
+
+const deriveStatus = (member = {}) => {
+  if (member.status === 'pending') return 'pending';
+  if (member.status === 'inactive' || member.status === 'archived') return 'inactive';
+  const { termEndAt } = resolveTermDates(member);
+  if (termEndAt && termEndAt.getTime() <= Date.now()) return 'inactive';
+  return 'active';
+};
+
+const isPrimaryAdminUser = (user = {}) =>
+  user.role === 'admin' && normalizeEmail(user.email) === PRIMARY_ADMIN_EMAIL;
+
+const mergeMemberRecord = (primary, secondary) => ({
+  ...secondary,
+  ...primary,
+  fullName: primary.fullName || secondary.fullName || primary.name || secondary.name,
+  name: primary.name || primary.fullName || secondary.name || secondary.fullName,
+  email: primary.email || secondary.email,
+  studentId: primary.studentId || secondary.studentId,
+  course: primary.course || secondary.course,
+  year: primary.year || secondary.year,
+  status: primary.status || secondary.status,
+  role: primary.role || secondary.role,
+  permissionRole: primary.permissionRole || secondary.permissionRole || '',
+  permissionRoleLabel: primary.permissionRoleLabel || secondary.permissionRoleLabel || '',
+  permissions: primary.permissions || secondary.permissions || [],
+  createdAt: primary.createdAt || secondary.createdAt
+});
 
 const roles = [
   {
     id: 'updates-manager',
     title: 'Updates Manager',
-    scope: 'Announcements and updates',
-    description: 'Can manage announcements, news posts, and site updates.',
+    scope: 'Updates page',
+    description: 'Can manage updates, news posts, and site updates.',
     permissions: ['announcements']
   },
   {
@@ -49,11 +99,38 @@ const AdminRolesPermissions = () => {
   const loadMembers = async () => {
     setLoading(true);
     try {
-      const usersSnapshot = await getDocs(collection(db, 'users'));
-      const users = usersSnapshot.docs
-        .map(userDoc => ({ id: userDoc.id, ...userDoc.data() }))
-        .filter(user => normalizeEmail(user.email) !== normalizeEmail(PRIMARY_ADMIN_EMAIL))
-        .filter(user => (user.status || 'active') === 'active')
+      const [membersSnapshot, usersSnapshot] = await Promise.all([
+        getDocs(collection(db, 'members')),
+        getDocs(collection(db, 'users'))
+      ]);
+
+      const membersData = membersSnapshot.docs.map(memberDoc => ({
+        id: memberDoc.id,
+        ...memberDoc.data()
+      }));
+      const usersData = usersSnapshot.docs.map(userDoc => ({
+        id: userDoc.id,
+        ...userDoc.data()
+      }));
+
+      const combinedMap = new Map();
+      usersData.forEach(user => {
+        combinedMap.set(user.id, {
+          ...user,
+          fullName: user.fullName || user.name,
+          role: isPrimaryAdminUser(user) ? 'admin' : (user.role || 'member')
+        });
+      });
+      membersData.forEach(member => {
+        const existing = combinedMap.get(member.id);
+        combinedMap.set(member.id, existing ? mergeMemberRecord(member, existing) : member);
+      });
+
+      const users = Array.from(combinedMap.values())
+        .filter(user => !isPrimaryAdminUser(user))
+        .filter(user => (user.role || 'member') !== 'admin')
+        .map(user => ({ ...user, effectiveStatus: deriveStatus(user) }))
+        .filter(user => user.effectiveStatus === 'active')
         .sort((a, b) => (a.fullName || a.name || '').localeCompare(b.fullName || b.name || ''));
 
       setMembers(users);

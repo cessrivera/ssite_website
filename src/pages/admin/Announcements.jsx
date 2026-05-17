@@ -87,8 +87,8 @@ const AdminAnnouncements = () => {
   const handleDelete = (id) => {
     setConfirmDialog({
       isOpen: true,
-      title: 'Delete Announcement',
-      message: 'Are you sure you want to permanently delete this announcement? This action cannot be undone.',
+      title: 'Delete Update',
+      message: 'Are you sure you want to permanently delete this update? This action cannot be undone.',
       confirmText: 'Delete',
       onConfirm: async () => {
         try {
@@ -106,8 +106,8 @@ const AdminAnnouncements = () => {
   const handleArchive = (id) => {
     setConfirmDialog({
       isOpen: true,
-      title: 'Archive Announcement',
-      message: 'Are you sure you want to archive this announcement? It will be hidden from the public page.',
+      title: 'Archive Update',
+      message: 'Are you sure you want to archive this update? It will be hidden from the public page.',
       confirmText: 'Archive',
       onConfirm: async () => {
         try {
@@ -153,8 +153,8 @@ const AdminAnnouncements = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Manage Announcements</h1>
-          <p className="text-gray-500 mt-1">Create, edit, and publish announcements</p>
+          <h1 className="text-3xl font-bold text-gray-900">Manage Updates</h1>
+          <p className="text-gray-500 mt-1">Create, edit, and publish updates</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -163,7 +163,7 @@ const AdminAnnouncements = () => {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          Add Announcement
+          Add Update
         </button>
       </div>
 
@@ -171,7 +171,7 @@ const AdminAnnouncements = () => {
       <Modal
         isOpen={showForm}
         onClose={resetForm}
-        title={editingAnnouncement ? 'Edit Announcement' : 'Create New Announcement'}
+        title={editingAnnouncement ? 'Edit Update' : 'Create New Update'}
         size="3xl"
         backdropClassName="bg-linear-to-br from-blue-100/70 via-white/70 to-slate-100/75 backdrop-blur-[2px]"
       >
@@ -203,7 +203,7 @@ const AdminAnnouncements = () => {
             value={formData.imageUrl}
             onChange={(url) => setFormData({ ...formData, imageUrl: url })}
             folder="ssite/announcements"
-            label="Announcement Image"
+            label="Update Image"
           />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -262,7 +262,7 @@ const AdminAnnouncements = () => {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              {editingAnnouncement ? 'Update Announcement' : 'Create Announcement'}
+              {editingAnnouncement ? 'Update' : 'Create Update'}
             </button>
             <button
               type="button"
@@ -275,7 +275,7 @@ const AdminAnnouncements = () => {
         </form>
       </Modal>
 
-      {/* Announcements Table */}
+      {/* Updates Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {/* Tab Toggle */}
         <div className="flex border-b border-gray-200">
@@ -295,7 +295,7 @@ const AdminAnnouncements = () => {
         {loading ? (
           <div className="text-center py-16">
             <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-            <p className="text-gray-500">Loading announcements...</p>
+            <p className="text-gray-500">Loading updates...</p>
           </div>
         ) : announcements.filter(a => showArchived ? a.archived : !a.archived).length === 0 ? (
           <div className="text-center py-16">
@@ -304,7 +304,7 @@ const AdminAnnouncements = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
               </svg>
             </div>
-            <p className="text-gray-500">{showArchived ? 'No archived announcements.' : 'No announcements yet. Create your first one!'}</p>
+            <p className="text-gray-500">{showArchived ? 'No archived updates.' : 'No updates yet. Create your first one!'}</p>
           </div>
         ) : (
           <table className="w-full">

@@ -68,7 +68,7 @@ const Analytics = () => {
       const registrationsSnapshot = await getDocs(collection(db, 'eventRegistrations'));
       const totalRegistrations = registrationsSnapshot.size;
 
-      // Announcements
+      // Updates
       const publishedAnn = announcements.filter(a => a.status === 'Published' && !a.archived).length;
       const draftAnn = announcements.filter(a => a.status === 'Draft' && !a.archived).length;
       const archivedAnn = announcements.filter(a => a.archived).length;
@@ -115,7 +115,7 @@ const Analytics = () => {
 
       // Content overview for bar chart
       const contentOverview = [
-        { name: 'Announcements', total: announcements.length, active: publishedAnn, inactive: draftAnn + archivedAnn },
+        { name: 'Updates', total: announcements.length, active: publishedAnn, inactive: draftAnn + archivedAnn },
         { name: 'Events', total: events.length, active: upcomingEvents, inactive: pastEvents + archivedEvents },
         { name: 'Polls', total: polls.length, active: activePolls, inactive: inactivePolls },
         { name: 'Messages', total: messages.length, active: repliedMessages, inactive: unreadMessages },
@@ -376,10 +376,10 @@ const Analytics = () => {
         </div>
       )}
 
-      {/* Announcements Breakdown */}
+      {/* Updates Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-1">Announcements Status</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Updates Status</h3>
           <p className="text-sm text-gray-500 mb-5">Published, draft, and archived counts</p>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={stats.announcementsBreakdown} barCategoryGap="45%">
@@ -401,7 +401,7 @@ const Analytics = () => {
           <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-5 text-white">
             <p className="text-blue-200 text-sm font-semibold">Content Published</p>
             <p className="text-4xl font-bold mt-1">{stats.publishedAnn + stats.totalEvents + stats.activePolls}</p>
-            <p className="text-blue-200 text-xs mt-2">Announcements, events & active polls</p>
+            <p className="text-blue-200 text-xs mt-2">Updates, events & active polls</p>
           </div>
           <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-2xl p-5 text-white">
             <p className="text-emerald-200 text-sm font-semibold">Engagement Rate</p>

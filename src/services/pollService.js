@@ -61,8 +61,14 @@ export const getPolls = async () => {
 export const getPollVoteDetails = async (pollId) => {
   try {
     const votesSnapshot = await getDocs(collection(db, 'pollVotes'));
-    const usersSnapshot = await getDocs(collection(db, 'users'));
-    const usersById = new Map(usersSnapshot.docs.map((userDoc) => [userDoc.id, userDoc.data()]));
+    let usersById = new Map();
+
+    try {
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      usersById = new Map(usersSnapshot.docs.map((userDoc) => [userDoc.id, userDoc.data()]));
+    } catch (error) {
+      console.warn('Unable to load user profiles for poll vote details:', error);
+    }
 
     return votesSnapshot.docs
       .map((voteDoc) => ({ id: voteDoc.id, ...voteDoc.data() }))
@@ -110,7 +116,7 @@ export const updatePoll = async (id, data) => {
   }
 };
 
-export const votePoll = async (pollId, optionIndex, userId) => {
+export const votePoll = async (pollId, optionIndex, userId, userProfile = {}) => {
   const voteRef = doc(db, 'pollVotes', `${pollId}_${userId}`);
   try {
     const pollRef = doc(db, COLLECTION, pollId);
@@ -134,6 +140,9 @@ export const votePoll = async (pollId, optionIndex, userId) => {
       pollId,
       userId,
       optionIndex,
+      name: userProfile.fullName || userProfile.name || '',
+      email: userProfile.email || '',
+      studentId: userProfile.studentId || '',
       votedAt: Timestamp.now(),
     });
   } catch (error) {

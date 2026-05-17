@@ -10,7 +10,7 @@ const Polls = () => {
   const [voteError, setVoteError] = useState('');
   const [voteSuccess, setVoteSuccess] = useState('');
   const [voteSuccessPollId, setVoteSuccessPollId] = useState(null);
-  const { currentUser } = useAuth();
+  const { currentUser, userData } = useAuth();
 
   const pollVisualThemes = [
     {
@@ -103,7 +103,10 @@ const Polls = () => {
       setVoteError('');
       setVoteSuccess('');
       setVoteSuccessPollId(null);
-      await votePoll(pollId, optionIndex, currentUser.uid);
+      await votePoll(pollId, optionIndex, currentUser.uid, {
+        ...userData,
+        email: userData?.email || currentUser.email || ''
+      });
       await loadPolls();
       setSelectedPoll(null);
       setSelectedOption(null);

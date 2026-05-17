@@ -25,40 +25,47 @@ service cloud.firestore {
         && requester().data.role == 'admin'
         && requester().data.email == 'pderivera.student@ua.edu.ph';
     }
+
+    function hasPermission(permission) {
+      return isSignedIn()
+        && requesterExists()
+        && requester().data.permissions is list
+        && requester().data.permissions.hasAny([permission]);
+    }
     
     // Allow public reads for site content
     match /announcements/{document=**} {
       allow read: if true;
-      allow write: if isPrimaryAdmin();
-      allow delete: if isPrimaryAdmin();
+      allow write: if isPrimaryAdmin() || hasPermission('announcements');
+      allow delete: if isPrimaryAdmin() || hasPermission('announcements');
     }
     
     match /events/{document=**} {
       allow read: if true;
-      allow write: if isPrimaryAdmin();
-      allow delete: if isPrimaryAdmin();
+      allow write: if isPrimaryAdmin() || hasPermission('events');
+      allow delete: if isPrimaryAdmin() || hasPermission('events');
     }
     
     match /officers/{document=**} {
       allow read: if true;
-      allow write: if isPrimaryAdmin();
-      allow delete: if isPrimaryAdmin();
+      allow write: if isPrimaryAdmin() || hasPermission('officers');
+      allow delete: if isPrimaryAdmin() || hasPermission('officers');
     }
     
     match /polls/{document=**} {
       allow read: if true;
-      allow write: if isPrimaryAdmin();
-      allow delete: if isPrimaryAdmin();
+      allow write: if isPrimaryAdmin() || hasPermission('polls');
+      allow delete: if isPrimaryAdmin() || hasPermission('polls');
     }
     
     match /pollVotes/{document=**} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() || isPrimaryAdmin() || hasPermission('polls');
       allow create: if isSignedIn()
                     && request.resource.data.userId is string
                     && request.resource.data.userId == request.auth.uid
                     && request.resource.data.pollId is string
                     && request.resource.data.optionIndex is int;
-      allow update, delete: if isPrimaryAdmin();
+      allow update, delete: if isPrimaryAdmin() || hasPermission('polls');
     }
     
     match /members/{document=**} {
@@ -102,16 +109,16 @@ service cloud.firestore {
     }
     
     match /users/{uid} {
-      allow read: if isSignedIn() && (request.auth.uid == uid || isPrimaryAdmin());
+      allow read: if isSignedIn() && (request.auth.uid == uid || isPrimaryAdmin() || hasPermission('polls'));
       allow create: if isSignedIn() && request.auth.uid == uid;
       allow update: if isSignedIn() && (request.auth.uid == uid || isPrimaryAdmin());
       allow delete: if isPrimaryAdmin();
     }
     
     match /eventRegistrations/{document=**} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() || isPrimaryAdmin() || hasPermission('events');
       allow create: if isSignedIn();
-      allow update, delete: if isPrimaryAdmin();
+      allow update, delete: if isPrimaryAdmin() || hasPermission('events');
     }
     
     match /notifications/{document=**} {
