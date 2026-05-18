@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/layout/Layout';
-import { AdminRoute, PermissionRoute } from './components/auth/ProtectedRoute';
+import { AdminIndexRoute, AdminRoute, PermissionRoute } from './components/auth/ProtectedRoute';
 import AdminLayout from './components/admin/AdminLayout';
 import MaintenanceGate from './components/common/MaintenanceGate';
 
@@ -45,7 +45,7 @@ function App() {
 
           {/* Admin Routes - never blocked by maintenance */}
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-            <Route index element={<PermissionRoute adminOnly><AdminDashboard /></PermissionRoute>} />
+            <Route index element={<AdminIndexRoute><AdminDashboard /></AdminIndexRoute>} />
             <Route path="announcements" element={<PermissionRoute permission="announcements"><AdminAnnouncements /></PermissionRoute>} />
             <Route path="events" element={<PermissionRoute permission="events"><AdminEvents /></PermissionRoute>} />
             <Route path="officers" element={<PermissionRoute permission="officers"><AdminOfficers /></PermissionRoute>} />

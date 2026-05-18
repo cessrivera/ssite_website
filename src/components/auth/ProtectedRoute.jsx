@@ -57,4 +57,20 @@ export const PermissionRoute = ({ permission, adminOnly = false, children }) => 
   );
 };
 
+export const AdminIndexRoute = ({ children }) => {
+  const { isAdmin, userData } = useAuth();
+  const permissions = Array.isArray(userData?.permissions) ? userData.permissions : [];
+  const firstAllowedPage = [
+    { permission: 'announcements', path: '/admin/announcements' },
+    { permission: 'events', path: '/admin/events' },
+    { permission: 'officers', path: '/admin/officers' },
+    { permission: 'polls', path: '/admin/polls' }
+  ].find((page) => permissions.includes(page.permission));
+
+  if (isAdmin) return children;
+  if (firstAllowedPage) return <Navigate to={firstAllowedPage.path} replace />;
+
+  return <Navigate to="/" replace />;
+};
+
 export default ProtectedRoute;

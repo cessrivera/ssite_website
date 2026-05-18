@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { getOfficers } from '../services/officerService';
 
 const Officers = () => {
   const [officers, setOfficers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedStartYear, setSelectedStartYear] = useState('');
-  const [selectedEndYear, setSelectedEndYear] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
   const parseAcademicTerm = (term) => {
@@ -35,10 +34,13 @@ const Officers = () => {
 
   // Generate dynamic year options from officers data + a reasonable range
   const currentYear = new Date().getFullYear();
-  const allYearOptions = [];
-  for (let y = currentYear + 1; y >= 2020; y--) {
-    allYearOptions.push(`${y}`);
-  }
+  const allTermOptions = useMemo(() => {
+    const terms = [];
+    for (let y = currentYear + 6; y >= 2020; y--) {
+      terms.push(`${y}-${y + 1}`);
+    }
+    return terms;
+  }, [currentYear]);
 
   useEffect(() => {
     loadOfficers();
@@ -46,7 +48,7 @@ const Officers = () => {
 
   useEffect(() => {
     // Set default filter to the latest academic year in data.
-    if (officers.length > 0 && (!selectedStartYear || !selectedEndYear)) {
+    if (officers.length > 0 && !selectedStartYear) {
       const terms = [...new Set(officers.map((officer) => officer.term).filter(Boolean))]
         .map((term) => parseAcademicTerm(term))
         .filter((term) => term.startYear && term.endYear)
@@ -54,13 +56,12 @@ const Officers = () => {
 
       if (terms.length > 0) {
         setSelectedStartYear(terms[0].startYear);
-        setSelectedEndYear(terms[0].endYear);
       } else {
-        setSelectedStartYear(allYearOptions[0]);
-        setSelectedEndYear(String(Number(allYearOptions[0]) + 1));
+        const fallbackStartYear = allTermOptions[0].split('-')[0];
+        setSelectedStartYear(fallbackStartYear);
       }
     }
-  }, [officers, selectedStartYear, selectedEndYear]);
+  }, [allTermOptions, officers, selectedStartYear]);
 
   const loadOfficers = async () => {
     try {
@@ -74,17 +75,13 @@ const Officers = () => {
     }
   };
 
-  const handleStartYearChange = (e) => {
-    setSelectedStartYear(e.target.value);
-  };
-
-  const handleEndYearChange = (e) => {
-    setSelectedEndYear(e.target.value);
+  const handleTermChange = (e) => {
+    setSelectedStartYear(e.target.value.split('-')[0]);
   };
 
   const filteredOfficers = officers.filter((officer) => {
     const term = parseAcademicTerm(officer.term);
-    const matchesTerm = term.startYear === selectedStartYear && term.endYear === selectedEndYear;
+    const matchesTerm = term.startYear === selectedStartYear;
     const matchesSearch = searchTerm === '' ||
       officer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       officer.position?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -118,47 +115,23 @@ const Officers = () => {
             </div>
           </div>
 
-          {/* Two separate year dropdowns */}
-          <div className="flex gap-4">
-            {/* Primary year dropdown */}
-            <div className="flex-1">
-              <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Start Year</label>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Academic Year</label>
               <div className="relative">
                 <select
-                  value={selectedStartYear}
-                  onChange={handleStartYearChange}
+                  value={selectedStartYear ? `${selectedStartYear}-${Number(selectedStartYear) + 1}` : ''}
+                  onChange={handleTermChange}
                   className="w-full border-2 rounded-xl px-5 py-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white font-medium cursor-pointer transition-all border-blue-500 text-blue-900"
                 >
-                  <option value="" disabled>Select year...</option>
-                  {allYearOptions.map(yr => (
-                    <option key={yr} value={yr}>{yr}</option>
+                  <option value="" disabled>Select academic year...</option>
+                  {allTermOptions.map(term => (
+                    <option key={term} value={term}>{term}</option>
                   ))}
                 </select>
                 <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </div>
-            </div>
-
-            {/* Secondary year dropdown */}
-            <div className="flex-1">
-              <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">End Year</label>
-              <div className="relative">
-                <select
-                  value={selectedEndYear}
-                  onChange={handleEndYearChange}
-                  className="w-full border-2 rounded-xl px-5 py-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white font-medium cursor-pointer transition-all border-blue-500 text-blue-900"
-                >
-                  <option value="" disabled>Select year...</option>
-                  {allYearOptions.map(yr => (
-                    <option key={yr} value={yr}>{yr}</option>
-                  ))}
-                </select>
-                <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
           </div>
         </div>
 

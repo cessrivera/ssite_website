@@ -12,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ImageUploader from '../../components/common/ImageUploader';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import Modal from '../../components/common/Modal';
+import { uploadImage } from '../../services/cloudinaryService';
 
 const AdminOfficers = () => {
   const { currentUser } = useAuth();
@@ -33,9 +34,11 @@ const AdminOfficers = () => {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [bulkArchiveMode, setBulkArchiveMode] = useState(false);
   const [bulkImportText, setBulkImportText] = useState('');
+  const [bulkPhotoFiles, setBulkPhotoFiles] = useState([]);
   const [selectedOfficerIds, setSelectedOfficerIds] = useState([]);
   const [archiving, setArchiving] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
+  const [bulkPhotoUploading, setBulkPhotoUploading] = useState(false);
   const [selectedTermFilter, setSelectedTermFilter] = useState('all');
   const [editingOfficer, setEditingOfficer] = useState(null);
   const [formData, setFormData] = useState({
@@ -95,6 +98,13 @@ const AdminOfficers = () => {
     if (!startYear || !endYear) return '';
     return `${startYear}-${endYear}`;
   };
+
+  const normalizePhotoKey = (value = '') =>
+    value
+      .toString()
+      .toLowerCase()
+      .replace(/\.[a-z0-9]+$/i, '')
+      .replace(/[^a-z0-9]+/g, '');
 
   const parseBulkOfficerRows = (text) => {
     const rows = text
@@ -228,18 +238,55 @@ const AdminOfficers = () => {
 
     setBulkImporting(true);
     try {
-      const result = await createOfficers(parsedOfficers);
+      let photoUrlMap = new Map();
+
+      if (bulkPhotoFiles.length > 0) {
+        setBulkPhotoUploading(true);
+        const uploadedPhotos = await Promise.all(
+          bulkPhotoFiles.map(async (file) => {
+            const result = await uploadImage(file, 'ssite/officers');
+            if (!result.success) {
+              throw new Error(result.error || `Could not upload ${file.name}`);
+            }
+            return {
+              name: file.name,
+              key: normalizePhotoKey(file.name),
+              url: result.url
+            };
+          })
+        );
+        photoUrlMap = new Map(uploadedPhotos.map((photo) => [photo.key, photo.url]));
+      }
+
+      const officersWithPhotos = parsedOfficers.map((officer) => {
+        const sheetImage = officer.image || '';
+        const matchedImage = photoUrlMap.get(normalizePhotoKey(sheetImage)) || photoUrlMap.get(normalizePhotoKey(officer.name));
+        return {
+          ...officer,
+          image: matchedImage || sheetImage
+        };
+      });
+
+      const result = await createOfficers(officersWithPhotos);
       if (!result.success) {
         console.error('Bulk officer import failed:', result.error);
       }
       setBulkImportText('');
+      setBulkPhotoFiles([]);
       setShowBulkImport(false);
       loadOfficers();
     } catch (error) {
       console.error('Error importing officers:', error);
     } finally {
       setBulkImporting(false);
+      setBulkPhotoUploading(false);
     }
+  };
+
+  const handleBulkPhotoFilesChange = (event) => {
+    const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith('image/'));
+    setBulkPhotoFiles(files);
+    event.target.value = '';
   };
 
   const handleSubmit = async (e) => {
@@ -644,7 +691,10 @@ const AdminOfficers = () => {
 
       <Modal
         isOpen={showBulkImport}
-        onClose={() => setShowBulkImport(false)}
+        onClose={() => {
+          setShowBulkImport(false);
+          setBulkPhotoFiles([]);
+        }}
         title="Bulk Add Officers"
         size="3xl"
         backdropClassName="bg-linear-to-br from-blue-100/70 via-white/70 to-slate-100/75 backdrop-blur-[2px]"
@@ -655,13 +705,41 @@ const AdminOfficers = () => {
             <textarea
               value={bulkImportText}
               onChange={(event) => setBulkImportText(event.target.value)}
-              placeholder="Name, Position, Course, Year, Term, Image URL, Order"
+              placeholder="Name	Position	Course	Year	Term	Photo filename	Order"
               rows={8}
               className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <p className="mt-2 text-xs text-gray-500">
-              Accepted columns: name, position, course, year, term, image URL, order. Commas or pasted spreadsheet tabs both work.
+              Copy directly from Google Sheets. Accepted columns: name, position, course, year, term, photo filename, order.
             </p>
+          </div>
+
+          <div className="rounded-xl border-2 border-dashed border-gray-300 p-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Officer photos folder</label>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleBulkPhotoFilesChange}
+              className="block w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
+            />
+            <p className="mt-2 text-xs text-gray-500">
+              Select the officer photos together. The importer matches each file by officer name, or by the photo filename column from the sheet.
+            </p>
+            {bulkPhotoFiles.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {bulkPhotoFiles.slice(0, 12).map((file) => (
+                  <span key={file.name} className="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
+                    {file.name}
+                  </span>
+                ))}
+                {bulkPhotoFiles.length > 12 && (
+                  <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
+                    +{bulkPhotoFiles.length - 12} more
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
@@ -684,7 +762,7 @@ const AdminOfficers = () => {
               disabled={bulkImporting || selectedBulkPreview.length === 0}
               className="bg-linear-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 disabled:from-gray-300 disabled:to-gray-300"
             >
-              {bulkImporting ? 'Importing...' : `Import ${selectedBulkPreview.length || ''} Officers`}
+              {bulkPhotoUploading ? 'Uploading photos...' : bulkImporting ? 'Importing...' : `Import ${selectedBulkPreview.length || ''} Officers`}
             </button>
             <button
               type="button"
