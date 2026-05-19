@@ -3,7 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getSupportEmail } from '../services/settingsService';
 import { collection, doc, getDoc, getDocs, query, setDoc, where, writeBatch } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 import { db } from '../config/firebase';
+import { auth } from '../config/firebase';
 
 const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
@@ -39,12 +41,6 @@ const Login = ({ defaultAdminLogin = false }) => {
     setError('');
     setLoading(true);
 
-    if (isAdminLogin && normalizeEmail(formData.email) !== PRIMARY_ADMIN_EMAIL) {
-      setError(`Only ${PRIMARY_ADMIN_EMAIL} is allowed for admin access.`);
-      setLoading(false);
-      return;
-    }
-
     const result = await login(formData.email, formData.password);
     
     if (result.success) {
@@ -53,6 +49,23 @@ const Login = ({ defaultAdminLogin = false }) => {
         try {
           const userRef = doc(db, 'users', result.user.uid);
           const userDoc = await getDoc(userRef);
+          const userData = userDoc.exists() ? userDoc.data() : {};
+          const normalizedEmail = normalizeEmail(result.user.email || formData.email);
+          const permissions = Array.isArray(userData.permissions) ? userData.permissions : [];
+          const scopedAdminPath = getPermissionLandingPage(permissions);
+
+          if (normalizedEmail !== PRIMARY_ADMIN_EMAIL && !scopedAdminPath) {
+            await signOut(auth);
+            setError('This account has no assigned admin page yet.');
+            setLoading(false);
+            return;
+          }
+
+          if (normalizedEmail !== PRIMARY_ADMIN_EMAIL) {
+            navigate(scopedAdminPath, { replace: true });
+            return;
+          }
+
           const adminData = {
             email: PRIMARY_ADMIN_EMAIL,
             role: 'admin',

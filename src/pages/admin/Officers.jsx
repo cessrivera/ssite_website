@@ -409,12 +409,12 @@ const AdminOfficers = () => {
             </svg>
             Bulk Add
           </button>
-          <div className="flex items-center overflow-hidden rounded-xl bg-amber-100 text-amber-800">
+          <div className="flex flex-wrap items-center gap-2">
             <select
               value={archiveTerm}
               onChange={(event) => setSelectedArchiveTerm(event.target.value)}
               disabled={archiving || activeTermOptions.length === 0}
-              className="h-11 bg-amber-50/70 px-3 text-sm font-semibold text-amber-900 outline-none disabled:opacity-60"
+              className="h-11 rounded-xl border border-amber-200 bg-amber-50 px-3 pr-8 text-sm font-semibold text-amber-900 outline-none transition-colors hover:bg-amber-100 disabled:opacity-60 disabled:cursor-not-allowed"
               aria-label="Select term to archive"
             >
               {activeTermOptions.length === 0 ? (
@@ -429,12 +429,12 @@ const AdminOfficers = () => {
               type="button"
               onClick={() => handleArchive(archiveTermOfficerIds, archiveTerm)}
               disabled={archiving || archiveTermOfficerIds.length === 0}
-              className="h-11 px-4 font-semibold transition-all duration-200 flex items-center gap-2 hover:bg-amber-200 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="h-11 rounded-xl bg-amber-100 px-4 font-semibold text-amber-800 transition-all duration-200 flex items-center gap-2 hover:bg-amber-200 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
               </svg>
-              Archive ({archiveTermOfficerIds.length})
+              Archive {archiveTerm} ({archiveTermOfficerIds.length})
             </button>
           </div>
           <button
