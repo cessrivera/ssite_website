@@ -124,6 +124,8 @@ const Navbar = () => {
   const scopedAdminPage = permissionLandingPages.find((page) => userPermissions.includes(page.permission));
   const adminMenuPath = isAdmin ? '/admin' : scopedAdminPage?.path;
   const adminMenuLabel = isAdmin ? 'Admin Dashboard' : scopedAdminPage?.label;
+  const displayName = userData?.fullName || userData?.name || currentUser?.displayName || currentUser?.email || 'User';
+  const displayEmail = userData?.email || currentUser?.email || '';
 
   const handleLogout = async () => {
     const result = await logout();
@@ -249,10 +251,10 @@ const Navbar = () => {
                   className="flex items-center gap-2 hover:bg-gray-50 rounded-lg px-3 py-2 transition-all duration-200 border border-transparent hover:border-gray-200"
                 >
                   <div className="w-9 h-9 bg-gradient-to-br from-blue-900 to-blue-700 text-white rounded-full flex items-center justify-center text-sm font-semibold shadow-sm">
-                    {getInitials(userData.fullName)}
+                    {getInitials(displayName)}
                   </div>
                   <span className="text-sm font-medium text-gray-700 hidden sm:block">
-                    {userData.fullName}
+                    {displayName}
                   </span>
                   <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -262,8 +264,8 @@ const Navbar = () => {
                 {showDropdown && (
                   <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden">
                     <div className="px-4 py-4 bg-gradient-to-br from-blue-50 to-white border-b">
-                      <p className="text-sm font-semibold text-gray-900">{userData.fullName}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{userData.email}</p>
+                      <p className="text-sm font-semibold text-gray-900">{displayName}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{displayEmail}</p>
                     </div>
                     <div className="p-2">
                       {adminMenuPath && (

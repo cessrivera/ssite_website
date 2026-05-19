@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, doc, getDocs, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
 const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
@@ -112,6 +112,20 @@ const AdminRolesPermissions = () => {
         id: userDoc.id,
         ...userDoc.data()
       }));
+      const roleAssignedMembers = membersData.filter(
+        member => Array.isArray(member.permissions) && member.permissions.length > 0
+      );
+
+      await Promise.allSettled(
+        roleAssignedMembers.map(member =>
+          setDoc(doc(db, 'users', member.id), {
+            permissionRole: member.permissionRole || '',
+            permissionRoleLabel: member.permissionRoleLabel || '',
+            permissions: member.permissions,
+            updatedAt: new Date().toISOString()
+          }, { merge: true })
+        )
+      );
 
       const combinedMap = new Map();
       usersData.forEach(user => {
@@ -143,8 +157,8 @@ const AdminRolesPermissions = () => {
 
   const updateRoleRecords = async (member, data) => {
     await Promise.allSettled([
-      updateDoc(doc(db, 'users', member.id), data),
-      updateDoc(doc(db, 'members', member.id), data)
+      setDoc(doc(db, 'users', member.id), data, { merge: true }),
+      setDoc(doc(db, 'members', member.id), data, { merge: true })
     ]);
   };
 
