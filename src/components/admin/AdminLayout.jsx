@@ -13,6 +13,11 @@ const AdminLayout = () => {
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
   useEffect(() => {
+    if (!isAdmin) {
+      setUnreadMessagesCount(0);
+      return undefined;
+    }
+
     const unreadMessagesQuery = query(
       collection(db, 'messages'),
       where('status', '==', 'unread')
@@ -29,7 +34,7 @@ const AdminLayout = () => {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     setIsSidebarOpen(false);

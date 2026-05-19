@@ -7,6 +7,15 @@ import { db } from '../config/firebase';
 
 const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
+const permissionLandingPages = [
+  { permission: 'announcements', path: '/admin/announcements' },
+  { permission: 'events', path: '/admin/events' },
+  { permission: 'officers', path: '/admin/officers' },
+  { permission: 'polls', path: '/admin/polls' }
+];
+
+const getPermissionLandingPage = (permissions = []) =>
+  permissionLandingPages.find((page) => permissions.includes(page.permission))?.path || '';
 
 const Login = ({ defaultAdminLogin = false }) => {
   const navigate = useNavigate();
@@ -93,8 +102,14 @@ const Login = ({ defaultAdminLogin = false }) => {
           setLoading(false);
         }
       } else {
-        // Regular member login
-        navigate('/');
+        const userRef = doc(db, 'users', result.user.uid);
+        const userDoc = await getDoc(userRef);
+        const permissions = userDoc.exists() && Array.isArray(userDoc.data().permissions)
+          ? userDoc.data().permissions
+          : [];
+        const scopedAdminPath = getPermissionLandingPage(permissions);
+
+        navigate(scopedAdminPath || '/');
       }
     } else {
       setError(result.error || 'Failed to login. Please check your credentials.');

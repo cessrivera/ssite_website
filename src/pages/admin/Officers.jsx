@@ -40,6 +40,7 @@ const AdminOfficers = () => {
   const [bulkImporting, setBulkImporting] = useState(false);
   const [bulkPhotoUploading, setBulkPhotoUploading] = useState(false);
   const [selectedTermFilter, setSelectedTermFilter] = useState('all');
+  const [selectedArchiveTerm, setSelectedArchiveTerm] = useState(currentTerm);
   const [editingOfficer, setEditingOfficer] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -366,16 +367,28 @@ const AdminOfficers = () => {
   const activeOfficers = officers.filter((officer) => !officer.archived);
   const termOptions = [...new Set(officers.map((officer) => normalizeTerm(officer.term)).filter(Boolean))]
     .sort((a, b) => b.localeCompare(a));
+  const activeTermOptions = [...new Set(activeOfficers.map((officer) => normalizeTerm(officer.term)).filter(Boolean))]
+    .sort((a, b) => b.localeCompare(a));
   const baseVisibleOfficers = showArchived ? officers : activeOfficers;
   const visibleOfficers = selectedTermFilter === 'all'
     ? baseVisibleOfficers
     : baseVisibleOfficers.filter((officer) => normalizeTerm(officer.term) === selectedTermFilter);
-  const currentTermOfficers = activeOfficers.filter(
-    (officer) => normalizeTerm(officer.term) === currentTerm
+  const archiveTerm = activeTermOptions.includes(selectedArchiveTerm)
+    ? selectedArchiveTerm
+    : activeTermOptions[0] || currentTerm;
+  const archiveTermOfficers = activeOfficers.filter(
+    (officer) => normalizeTerm(officer.term) === archiveTerm
   );
-  const currentTermOfficerIds = currentTermOfficers.map((officer) => officer.id);
+  const archiveTermOfficerIds = archiveTermOfficers.map((officer) => officer.id);
   const selectedOfficers = officers.filter((officer) => selectedOfficerIds.includes(officer.id));
   const selectedBulkPreview = parseBulkOfficerRows(bulkImportText);
+
+  useEffect(() => {
+    if (activeTermOptions.length === 0) return;
+    if (!activeTermOptions.includes(selectedArchiveTerm)) {
+      setSelectedArchiveTerm(activeTermOptions[0]);
+    }
+  }, [activeTermOptions, selectedArchiveTerm]);
 
   return (
     <div className="space-y-6">
@@ -396,17 +409,34 @@ const AdminOfficers = () => {
             </svg>
             Bulk Add
           </button>
-          <button
-            type="button"
-            onClick={() => handleArchive(currentTermOfficerIds, currentTerm)}
-            disabled={archiving || currentTermOfficerIds.length === 0}
-            className="px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 flex items-center gap-2 bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-            Archive {currentTerm}
-          </button>
+          <div className="flex items-center overflow-hidden rounded-xl bg-amber-100 text-amber-800">
+            <select
+              value={archiveTerm}
+              onChange={(event) => setSelectedArchiveTerm(event.target.value)}
+              disabled={archiving || activeTermOptions.length === 0}
+              className="h-11 bg-amber-50/70 px-3 text-sm font-semibold text-amber-900 outline-none disabled:opacity-60"
+              aria-label="Select term to archive"
+            >
+              {activeTermOptions.length === 0 ? (
+                <option value={currentTerm}>{currentTerm}</option>
+              ) : (
+                activeTermOptions.map((term) => (
+                  <option key={term} value={term}>{term}</option>
+                ))
+              )}
+            </select>
+            <button
+              type="button"
+              onClick={() => handleArchive(archiveTermOfficerIds, archiveTerm)}
+              disabled={archiving || archiveTermOfficerIds.length === 0}
+              className="h-11 px-4 font-semibold transition-all duration-200 flex items-center gap-2 hover:bg-amber-200 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              </svg>
+              Archive ({archiveTermOfficerIds.length})
+            </button>
+          </div>
           <button
             type="button"
             onClick={handleToggleBulkArchive}
