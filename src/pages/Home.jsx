@@ -25,13 +25,12 @@ const Home = () => {
     }
   };
 
-  // Quick access items based on wireframe
   const quickAccess = [
-    { icon: '📢', label: 'Updates', sublabel: 'Latest Updates', path: '/announcements', color: 'from-blue-500 to-blue-600' },
-    { icon: '📅', label: 'Events', sublabel: 'Upcoming Activities', path: '/events', color: 'from-purple-500 to-purple-600' },
-    { icon: '👥', label: 'Officers', sublabel: 'Meet the Team', path: '/officers', color: 'from-emerald-500 to-emerald-600' },
-    { icon: '📊', label: 'Polls', sublabel: 'Vote Now', path: '/polls', color: 'from-amber-500 to-amber-600' },
-    { icon: '🎓', label: 'Membership', sublabel: 'Sign Up', path: '/membership', color: 'from-rose-500 to-rose-600' },
+    { iconClass: 'bi-megaphone-fill', label: 'Updates', sublabel: 'Latest Updates', path: '/announcements', color: 'from-blue-500 to-blue-600' },
+    { iconClass: 'bi-calendar-event-fill', label: 'Events', sublabel: 'Upcoming Activities', path: '/events', color: 'from-purple-500 to-purple-600' },
+    { iconClass: 'bi-people-fill', label: 'Officers', sublabel: 'Meet the Team', path: '/officers', color: 'from-emerald-500 to-emerald-600' },
+    { iconClass: 'bi-bar-chart-line-fill', label: 'Polls', sublabel: 'Vote Now', path: '/polls', color: 'from-amber-500 to-amber-600' },
+    { iconClass: 'bi-mortarboard-fill', label: 'Membership', sublabel: 'Member Login', path: '/login', color: 'from-rose-500 to-rose-600' },
   ];
 
   // Get latest announcements and featured announcement
@@ -58,14 +57,14 @@ const Home = () => {
             </h1>
             <p className="text-lg md:text-xl text-blue-100 mb-10 leading-relaxed">
               Empowering students through technology, innovation, and community.
-              Join SSITE and be part of the next generation of IT leaders.
+              Member access is managed by SSITE administrators.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                to="/membership"
+                to="/login"
                 className="bg-yellow-400 text-blue-900 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-yellow-300 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
-                Join SSITE Today
+                Member Login
               </Link>
               <Link
                 to="/announcements"
@@ -100,8 +99,8 @@ const Home = () => {
                 to={item.path}
                 className="group bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:border-transparent transition-all duration-300 transform hover:-translate-y-2"
               >
-                <div className={`w-14 h-14 bg-linear-to-br ${item.color} rounded-xl flex items-center justify-center text-2xl mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                  {item.icon}
+                <div className={`w-14 h-14 bg-linear-to-br ${item.color} rounded-xl flex items-center justify-center text-2xl text-white mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                  <i className={`bi ${item.iconClass}`} aria-hidden="true"></i>
                 </div>
                 <h3 className="font-bold text-gray-900 mb-1">{item.label}</h3>
                 <p className="text-sm text-gray-500">{item.sublabel}</p>

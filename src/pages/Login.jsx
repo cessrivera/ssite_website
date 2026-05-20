@@ -21,7 +21,7 @@ const getPermissionLandingPage = (permissions = []) =>
 
 const Login = ({ defaultAdminLogin = false }) => {
   const navigate = useNavigate();
-  const { login, currentUser, isAdmin } = useAuth();
+  const { login, loginWithGoogle, currentUser, isAdmin } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -126,6 +126,27 @@ const Login = ({ defaultAdminLogin = false }) => {
       }
     } else {
       setError(result.error || 'Failed to login. Please check your credentials.');
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError('');
+    setLoading(true);
+
+    const result = await loginWithGoogle();
+
+    if (result.success) {
+      const userRef = doc(db, 'users', result.user.uid);
+      const userDoc = await getDoc(userRef);
+      const permissions = userDoc.exists() && Array.isArray(userDoc.data().permissions)
+        ? userDoc.data().permissions
+        : [];
+      const scopedAdminPath = getPermissionLandingPage(permissions);
+
+      navigate(scopedAdminPath || '/');
+    } else {
+      setError(result.error || 'Google sign-in failed. Please try again.');
       setLoading(false);
     }
   };
@@ -323,6 +344,16 @@ const Login = ({ defaultAdminLogin = false }) => {
                 )}
               </button>
 
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="w-full border-2 border-gray-200 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-50 transition-colors disabled:cursor-not-allowed disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                <i className="bi bi-google text-red-500" aria-hidden="true"></i>
+                Continue with Google
+              </button>
+
               <p className="text-center">
                 <Link to="/forgot-password" className="text-blue-600 text-sm font-medium hover:underline">
                   Forgot Password?
@@ -331,11 +362,11 @@ const Login = ({ defaultAdminLogin = false }) => {
             </form>
 
             <div className="mt-6 pt-6 border-t border-gray-100 text-center">
-              <p className="text-gray-600">
-                Don't have an account?{' '}
-                <Link to="/membership" className="text-blue-600 font-semibold hover:underline">
-                  Register here
-                </Link>
+              <p className="text-sm text-gray-600">
+                Accounts are added by the SSITE administrator.
+                {supportEmail && (
+                  <> Contact <span className="font-semibold text-blue-700">{supportEmail}</span> for access.</>
+                )}
               </p>
             </div>
           </div>

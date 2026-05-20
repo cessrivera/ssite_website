@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/layout/Layout';
 import { AdminIndexRoute, AdminRoute, PermissionRoute } from './components/auth/ProtectedRoute';
@@ -11,7 +11,6 @@ import Events from './pages/Events';
 import Officers from './pages/Officers';
 import Polls from './pages/Polls';
 import Contact from './pages/Contact';
-import Membership from './pages/Membership';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 
@@ -38,7 +37,7 @@ function App() {
           <Route path="/officers" element={<MaintenanceGate><Layout><Officers /></Layout></MaintenanceGate>} />
           <Route path="/polls" element={<MaintenanceGate><Layout><Polls /></Layout></MaintenanceGate>} />
           <Route path="/contact" element={<MaintenanceGate><Layout><Contact /></Layout></MaintenanceGate>} />
-          <Route path="/membership" element={<MaintenanceGate><Layout><Membership /></Layout></MaintenanceGate>} />
+          <Route path="/membership" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Layout><Login /></Layout>} />
           <Route path="/admin-login" element={<Layout><Login defaultAdminLogin={true} /></Layout>} />
           <Route path="/forgot-password" element={<Layout><ForgotPassword /></Layout>} />

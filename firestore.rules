@@ -69,21 +69,18 @@ service cloud.firestore {
     }
     
     match /members/{document=**} {
-      allow read: if isPrimaryAdmin();
-      allow create: if isPrimaryAdmin()
-                    || (isSignedIn()
-                        && request.resource.data.userId is string
-                        && request.resource.data.userId == request.auth.uid
-                        && request.resource.data.status == 'pending');
+      allow read: if isPrimaryAdmin()
+                  || (isSignedIn()
+                      && request.auth.token.email is string
+                      && resource.data.emailNormalized is string
+                      && resource.data.emailNormalized == request.auth.token.email.lower());
+      allow create: if isPrimaryAdmin();
       allow update, delete: if isPrimaryAdmin();
     }
 
     match /memberStudentIds/{studentId} {
       allow read: if isPrimaryAdmin();
-      allow create: if isSignedIn()
-                    && request.resource.data.userId is string
-                    && request.resource.data.userId == request.auth.uid
-                    && !exists(/databases/$(database)/documents/memberStudentIds/$(studentId));
+      allow create: if isPrimaryAdmin();
       allow update, delete: if isPrimaryAdmin();
     }
     
@@ -109,8 +106,16 @@ service cloud.firestore {
     }
     
     match /users/{uid} {
-      allow read: if isSignedIn() && (request.auth.uid == uid || isPrimaryAdmin() || hasPermission('polls'));
-      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow read: if isSignedIn()
+                  && (
+                    request.auth.uid == uid
+                    || isPrimaryAdmin()
+                    || hasPermission('polls')
+                    || (request.auth.token.email is string
+                        && resource.data.emailNormalized is string
+                        && resource.data.emailNormalized == request.auth.token.email.lower())
+                  );
+      allow create: if isPrimaryAdmin() || (isSignedIn() && request.auth.uid == uid);
       allow update: if isSignedIn() && (request.auth.uid == uid || isPrimaryAdmin());
       allow delete: if isPrimaryAdmin();
     }

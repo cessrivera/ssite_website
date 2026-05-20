@@ -1,18 +1,20 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { 
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
-  createUserWithEmailAndPassword,
-  deleteUser
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 
 const AuthContext = createContext();
 const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
 const MEMBER_TERM_YEARS = 5;
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 const toDateValue = (value) => {
   if (!value) return null;
@@ -38,6 +40,25 @@ const resolveTermDates = (data = {}) => {
   };
 };
 
+const isInactiveMember = (data = {}) => data.status === 'inactive' || data.status === 'archived';
+
+const findManagedMemberByEmail = async (email) => {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return null;
+
+  const [usersSnapshot, membersSnapshot] = await Promise.all([
+    getDocs(query(collection(db, 'users'), where('emailNormalized', '==', normalizedEmail))),
+    getDocs(query(collection(db, 'members'), where('emailNormalized', '==', normalizedEmail)))
+  ]);
+
+  const records = [
+    ...usersSnapshot.docs.map((record) => ({ id: record.id, ...record.data() })),
+    ...membersSnapshot.docs.map((record) => ({ id: record.id, ...record.data() }))
+  ];
+
+  return records.find((record) => !isInactiveMember(record)) || records[0] || null;
+};
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -51,7 +72,6 @@ export const AuthProvider = ({ children }) => {
   const [userRole, setUserRole] = useState(null); // 'admin' or 'member'
   const [userData, setUserData] = useState(null); // Full user data from Firestore
   const [loading, setLoading] = useState(true);
-  const registerInFlight = useRef(false);
 
   const login = async (email, password) => {
     try {
@@ -76,16 +96,14 @@ export const AuthProvider = ({ children }) => {
 
         const termExpired = termEndAt ? termEndAt.getTime() <= Date.now() : false;
 
-        // If user is pending approval, sign them out and return error
         if (userData.status === 'pending') {
-          await signOut(auth);
-          return { 
-            success: false, 
-            error: 'Your account is pending admin approval. Please wait for confirmation.' 
-          };
+          await updateDoc(userRef, {
+            status: 'active',
+            updatedAt: new Date().toISOString()
+          });
         }
-        // If user is archived/inactive, prevent login
-        if (userData.status === 'inactive' || userData.status === 'archived') {
+
+        if (isInactiveMember(userData)) {
           await signOut(auth);
           return { 
             success: false, 
@@ -113,6 +131,98 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginWithGoogle = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const normalizedEmail = normalizeEmail(result.user.email || '');
+      const userRef = doc(db, 'users', result.user.uid);
+      const userDoc = await getDoc(userRef);
+      let resolvedUserData = userDoc.exists() ? userDoc.data() : null;
+
+      if (!resolvedUserData) {
+        const managedMember = await findManagedMemberByEmail(normalizedEmail);
+
+        if (!managedMember) {
+          await signOut(auth);
+          return {
+            success: false,
+            error: 'This Google account is not on the member list yet. Please contact an administrator.'
+          };
+        }
+
+        if (isInactiveMember(managedMember)) {
+          await signOut(auth);
+          return {
+            success: false,
+            error: 'Your account has been deactivated. Please contact an administrator.'
+          };
+        }
+
+        const { termStartAt, termEndAt } = resolveTermDates(managedMember);
+        const createdAt = managedMember.createdAt || new Date().toISOString();
+        resolvedUserData = {
+          email: normalizedEmail,
+          emailNormalized: normalizedEmail,
+          role: 'member',
+          name: managedMember.name || managedMember.fullName || result.user.displayName || '',
+          fullName: managedMember.fullName || managedMember.name || result.user.displayName || '',
+          studentId: managedMember.studentId || '',
+          year: managedMember.year || '',
+          course: managedMember.course || 'BSIT',
+          status: 'active',
+          authProvider: 'google',
+          permissions: managedMember.permissions || [],
+          permissionRole: managedMember.permissionRole || '',
+          permissionRoleLabel: managedMember.permissionRoleLabel || '',
+          termStartAt: termStartAt?.toISOString(),
+          termEndAt: termEndAt?.toISOString(),
+          termYears: managedMember.termYears || MEMBER_TERM_YEARS,
+          createdAt,
+          updatedAt: new Date().toISOString()
+        };
+
+        await setDoc(userRef, resolvedUserData, { merge: true });
+      }
+
+      if (resolvedUserData.status === 'pending') {
+        resolvedUserData = { ...resolvedUserData, status: 'active' };
+        await setDoc(userRef, {
+          status: 'active',
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+
+      if (isInactiveMember(resolvedUserData)) {
+        await signOut(auth);
+        return {
+          success: false,
+          error: 'Your account has been deactivated. Please contact an administrator.'
+        };
+      }
+
+      const { termStartAt, termEndAt } = resolveTermDates(resolvedUserData);
+      const termExpired = termEndAt ? termEndAt.getTime() <= Date.now() : false;
+
+      if (termExpired) {
+        await setDoc(userRef, {
+          status: 'inactive',
+          termStartAt: termStartAt?.toISOString(),
+          termEndAt: termEndAt?.toISOString(),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        await signOut(auth);
+        return {
+          success: false,
+          error: 'Your membership term has expired. Please contact an administrator.'
+        };
+      }
+
+      return { success: true, user: result.user };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  };
+
   const logout = async () => {
     try {
       await signOut(auth);
@@ -121,106 +231,6 @@ export const AuthProvider = ({ children }) => {
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
-    }
-  };
-
-  const register = async (email, password, userData) => {
-    if (registerInFlight.current) {
-      return { success: false, error: 'Registration already in progress. Please wait.' };
-    }
-
-    registerInFlight.current = true;
-    let createdUser = null;
-
-    try {
-      const normalizedEmail = normalizeEmail(email);
-      const trimmedStudentId = (userData?.studentId || '').trim();
-      const trimmedName = (userData?.name || '').trim();
-      const trimmedYear = (userData?.year || '').trim();
-      const trimmedCourse = (userData?.course || 'BSIT').trim();
-      const termStartAt = new Date();
-      const termEndAt = addYears(termStartAt, MEMBER_TERM_YEARS);
-
-      if (!normalizedEmail) {
-        return { success: false, error: 'Email is required.' };
-      }
-
-      const result = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
-      createdUser = result.user;
-
-      const batch = writeBatch(db);
-      const createdAt = new Date().toISOString();
-      const termStartAtIso = termStartAt.toISOString();
-      const termEndAtIso = termEndAt?.toISOString();
-
-      batch.set(doc(db, 'users', result.user.uid), {
-        email: normalizedEmail,
-        emailNormalized: normalizedEmail,
-        role: 'member',
-        name: trimmedName,
-        studentId: trimmedStudentId,
-        year: trimmedYear,
-        course: trimmedCourse,
-        termStartAt: termStartAtIso,
-        termEndAt: termEndAtIso,
-        termYears: MEMBER_TERM_YEARS,
-        createdAt,
-        status: 'pending'
-      });
-
-      batch.set(doc(db, 'members', result.user.uid), {
-        userId: result.user.uid,
-        studentId: trimmedStudentId,
-        name: trimmedName,
-        year: trimmedYear,
-        course: trimmedCourse,
-        email: normalizedEmail,
-        emailNormalized: normalizedEmail,
-        role: 'member',
-        status: 'pending',
-        archived: false,
-        termStartAt: termStartAtIso,
-        termEndAt: termEndAtIso,
-        termYears: MEMBER_TERM_YEARS,
-        createdAt,
-        updatedAt: createdAt
-      });
-
-      if (trimmedStudentId) {
-        batch.set(doc(db, 'memberStudentIds', trimmedStudentId), {
-          userId: result.user.uid,
-          email: normalizedEmail,
-          emailNormalized: normalizedEmail,
-          createdAt
-        });
-      }
-
-      await batch.commit();
-
-      // Sign out immediately — pending users must not access the app
-      await signOut(auth);
-
-      return { success: true, user: result.user };
-    } catch (error) {
-      if (createdUser && auth.currentUser?.uid === createdUser.uid) {
-        try {
-          await deleteUser(createdUser);
-        } catch (cleanupError) {
-          console.error('Failed to clean up auth user after registration error:', cleanupError);
-        }
-      }
-
-      if (error?.code === 'auth/email-already-in-use') {
-        return { success: false, error: 'Email already registered. Please log in or use a different email.' };
-      }
-
-      if (error?.code === 'permission-denied') {
-        return { success: false, error: 'Student number already registered. Please contact an administrator.' };
-      }
-
-      return { success: false, error: error.message };
-    } finally {
-      registerInFlight.current = false;
     }
   };
 
@@ -276,7 +286,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     logout,
-    register
+    loginWithGoogle
   };
 
   return (

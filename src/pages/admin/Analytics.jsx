@@ -82,9 +82,17 @@ const Analytics = () => {
 
       // Members
       const adminUsers = users.filter(isPrimaryAdminUser);
-      const activeMembers = users.filter(u => !isPrimaryAdminUser(u) && u.status === 'active').length;
-      const pendingMembers = users.filter(u => !isPrimaryAdminUser(u) && u.status === 'pending').length;
-      const totalMembers = activeMembers + pendingMembers + members.length;
+      const memberMap = new Map();
+      [...users, ...members]
+        .filter(member => !isPrimaryAdminUser(member))
+        .forEach(member => {
+          const key = member.emailNormalized || normalizeEmail(member.email) || member.id;
+          memberMap.set(key, { ...memberMap.get(key), ...member });
+        });
+      const memberRecords = Array.from(memberMap.values());
+      const inactiveMembers = memberRecords.filter(member => member.status === 'inactive' || member.status === 'archived').length;
+      const activeMembers = memberRecords.length - inactiveMembers;
+      const totalMembers = memberRecords.length;
 
       // Polls
       const activePolls = polls.filter(p => p.active).length;
@@ -127,7 +135,7 @@ const Analytics = () => {
         publishedAnn, draftAnn, archivedAnn,
         totalEvents: events.length,
         upcomingEvents, pastEvents, archivedEvents,
-        totalMembers, activeMembers, pendingMembers,
+        totalMembers, activeMembers, inactiveMembers,
         totalAdmins: adminUsers.length,
         totalPolls: polls.length,
         activePolls, inactivePolls, totalVotes,
@@ -151,7 +159,7 @@ const Analytics = () => {
         ],
         membersBreakdown: [
           { name: 'Active', value: activeMembers },
-          { name: 'Pending', value: pendingMembers },
+          { name: 'Inactive', value: inactiveMembers },
         ],
         messagesBreakdown: [
           { name: 'Unread', value: unreadMessages },
@@ -211,7 +219,7 @@ const Analytics = () => {
         {/* Members Donut */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
           <h3 className="text-lg font-bold text-gray-900 mb-1">Member Status</h3>
-          <p className="text-sm text-gray-500 mb-4">Active vs pending members</p>
+          <p className="text-sm text-gray-500 mb-4">Active vs inactive members</p>
           <div className="flex-1 flex items-center justify-center">
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>

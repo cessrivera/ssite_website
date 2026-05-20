@@ -28,7 +28,6 @@ const resolveTermDates = (member = {}) => {
 };
 
 const deriveStatus = (member = {}) => {
-  if (member.status === 'pending') return 'pending';
   if (member.status === 'inactive' || member.status === 'archived') return 'inactive';
   const { termEndAt } = resolveTermDates(member);
   if (termEndAt && termEndAt.getTime() <= Date.now()) return 'inactive';
@@ -52,7 +51,11 @@ const mergeMemberRecord = (primary, secondary) => ({
   permissionRole: primary.permissionRole || secondary.permissionRole || '',
   permissionRoleLabel: primary.permissionRoleLabel || secondary.permissionRoleLabel || '',
   permissions: primary.permissions || secondary.permissions || [],
-  createdAt: primary.createdAt || secondary.createdAt
+  createdAt: primary.createdAt || secondary.createdAt,
+  sourceIds: {
+    members: [...new Set([...(secondary.sourceIds?.members || []), ...(primary.sourceIds?.members || [])])],
+    users: [...new Set([...(secondary.sourceIds?.users || []), ...(primary.sourceIds?.users || [])])]
+  }
 });
 
 const roles = [
@@ -91,6 +94,8 @@ const AdminRolesPermissions = () => {
   const [loading, setLoading] = useState(true);
   const [savingRole, setSavingRole] = useState('');
   const [selectedUser, setSelectedUser] = useState('');
+  const [memberSearch, setMemberSearch] = useState('');
+  const [searchMessage, setSearchMessage] = useState('');
 
   useEffect(() => {
     loadMembers();
@@ -106,10 +111,12 @@ const AdminRolesPermissions = () => {
 
       const membersData = membersSnapshot.docs.map(memberDoc => ({
         id: memberDoc.id,
+        sourceIds: { members: [memberDoc.id], users: [] },
         ...memberDoc.data()
       }));
       const usersData = usersSnapshot.docs.map(userDoc => ({
         id: userDoc.id,
+        sourceIds: { members: [], users: [userDoc.id] },
         ...userDoc.data()
       }));
       const roleAssignedMembers = membersData.filter(
@@ -129,15 +136,17 @@ const AdminRolesPermissions = () => {
 
       const combinedMap = new Map();
       usersData.forEach(user => {
-        combinedMap.set(user.id, {
+        const mergeKey = user.emailNormalized || normalizeEmail(user.email) || user.id;
+        combinedMap.set(mergeKey, {
           ...user,
           fullName: user.fullName || user.name,
           role: isPrimaryAdminUser(user) ? 'admin' : (user.role || 'member')
         });
       });
       membersData.forEach(member => {
-        const existing = combinedMap.get(member.id);
-        combinedMap.set(member.id, existing ? mergeMemberRecord(member, existing) : member);
+        const mergeKey = member.emailNormalized || normalizeEmail(member.email) || member.id;
+        const existing = combinedMap.get(mergeKey);
+        combinedMap.set(mergeKey, existing ? mergeMemberRecord(member, existing) : member);
       });
 
       const users = Array.from(combinedMap.values())
@@ -156,9 +165,12 @@ const AdminRolesPermissions = () => {
   };
 
   const updateRoleRecords = async (member, data) => {
+    const userIds = member.sourceIds?.users?.length ? member.sourceIds.users : [member.id];
+    const memberIds = member.sourceIds?.members?.length ? member.sourceIds.members : [member.id];
+
     await Promise.allSettled([
-      setDoc(doc(db, 'users', member.id), data, { merge: true }),
-      setDoc(doc(db, 'members', member.id), data, { merge: true })
+      ...userIds.map(userId => setDoc(doc(db, 'users', userId), data, { merge: true })),
+      ...memberIds.map(memberId => setDoc(doc(db, 'members', memberId), data, { merge: true }))
     ]);
   };
 
@@ -175,6 +187,8 @@ const AdminRolesPermissions = () => {
         updatedAt: new Date().toISOString()
       });
       setSelectedUser('');
+      setMemberSearch('');
+      setSearchMessage('');
       await loadMembers();
     } catch (error) {
       console.error('Error assigning role:', error);
@@ -201,6 +215,27 @@ const AdminRolesPermissions = () => {
   };
 
   const getRoleManagers = (roleId) => members.filter(member => member.permissionRole === roleId);
+  const memberSearchMatches = memberSearch.trim()
+    ? members.filter(member => {
+      const query = memberSearch.trim().toLowerCase();
+      return [member.fullName, member.name, member.email, member.studentId]
+        .map(value => String(value || '').toLowerCase())
+        .some(value => value.includes(query));
+    }).slice(0, 5)
+    : [];
+
+  const handleSearchMember = () => {
+    if (memberSearchMatches.length === 0) {
+      setSelectedUser('');
+      setSearchMessage('No active member found.');
+      return;
+    }
+
+    setSelectedUser(memberSearchMatches[0].id);
+    setSearchMessage('');
+  };
+
+  const selectedMember = members.find(member => member.id === selectedUser);
 
   return (
     <div className="space-y-6">
@@ -216,19 +251,56 @@ const AdminRolesPermissions = () => {
             <p className="text-sm text-gray-500">Choose an active member, then add them to one of the roles below.</p>
           </div>
           <div className="w-full lg:max-w-md">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Active member</label>
-            <select
-              value={selectedUser}
-              onChange={(event) => setSelectedUser(event.target.value)}
-              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Select member</option>
-              {members.map(member => (
-                <option key={member.id} value={member.id}>
-                  {member.fullName || member.name || member.email} {member.permissionRoleLabel ? `- ${member.permissionRoleLabel}` : ''}
-                </option>
-              ))}
-            </select>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Search active member</label>
+            <div className="flex gap-2">
+              <input
+                type="search"
+                value={memberSearch}
+                onChange={(event) => {
+                  setMemberSearch(event.target.value);
+                  setSearchMessage('');
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleSearchMember();
+                  }
+                }}
+                placeholder="Name, email, or student number"
+                className="min-w-0 flex-1 border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <button
+                type="button"
+                onClick={handleSearchMember}
+                className="shrink-0 rounded-xl bg-blue-900 px-4 py-3 font-semibold text-white transition-colors hover:bg-blue-800"
+              >
+                Search
+              </button>
+            </div>
+            {searchMessage && <p className="mt-2 text-sm text-red-600">{searchMessage}</p>}
+            {selectedMember && (
+              <p className="mt-2 rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">
+                Selected: {selectedMember.fullName || selectedMember.name || selectedMember.email}
+              </p>
+            )}
+            {memberSearchMatches.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {memberSearchMatches.map(member => (
+                  <button
+                    type="button"
+                    key={member.id}
+                    onClick={() => {
+                      setSelectedUser(member.id);
+                      setSearchMessage('');
+                    }}
+                    className="block w-full rounded-lg border border-gray-100 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                  >
+                    <span className="font-semibold text-gray-900">{member.fullName || member.name || 'Unnamed member'}</span>
+                    <span className="block text-xs text-gray-500">{member.email}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

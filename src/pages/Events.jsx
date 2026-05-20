@@ -55,8 +55,8 @@ const Events = () => {
   const handleRegisterClick = () => {
     if (!currentUser) {
       // Not logged in - show confirmation
-      if (window.confirm('You need to sign up or log in to register for events. Would you like to go to the membership page?')) {
-        navigate('/membership');
+      if (window.confirm('You need to log in to register for events. Would you like to go to the login page?')) {
+        navigate('/login');
       }
       return;
     }

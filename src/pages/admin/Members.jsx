@@ -1,13 +1,22 @@
-import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
+import { collection, deleteDoc, doc, getDocs, orderBy, query, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 
 const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
+const MEMBER_TERM_YEARS = 5;
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
 const isPrimaryAdminUser = (user = {}) =>
   user.role === 'admin' && normalizeEmail(user.email) === PRIMARY_ADMIN_EMAIL;
-const MEMBER_TERM_YEARS = 5;
+
+const emptyMemberForm = {
+  name: '',
+  email: '',
+  studentId: '',
+  course: 'BSIT',
+  year: ''
+};
+const blockedDocIdCharacters = new RegExp('[\\\\/#?\\[\\]]', 'g');
 
 const toDateValue = (value) => {
   if (!value) return null;
@@ -31,7 +40,6 @@ const resolveTermDates = (member = {}) => {
 };
 
 const deriveStatus = (member = {}) => {
-  if (member.status === 'pending') return 'pending';
   if (member.status === 'inactive' || member.status === 'archived') return 'inactive';
   const { termEndAt } = resolveTermDates(member);
   if (termEndAt && termEndAt.getTime() <= Date.now()) return 'inactive';
@@ -39,196 +47,341 @@ const deriveStatus = (member = {}) => {
 };
 
 const matchesSearch = (member = {}, rawQuery = '') => {
-  const query = rawQuery.trim().toLowerCase();
-  if (!query) return true;
-  return [member.name, member.email, member.studentId]
+  const search = rawQuery.trim().toLowerCase();
+  if (!search) return true;
+
+  return [member.name, member.fullName, member.email, member.studentId]
     .map((value) => String(value || '').toLowerCase())
-    .some((value) => value.includes(query));
+    .some((value) => value.includes(search));
+};
+
+const getMemberDocId = (email) =>
+  normalizeEmail(email).replace(blockedDocIdCharacters, '_');
+
+const splitCsvLine = (line) => {
+  const values = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    const next = line[index + 1];
+
+    if (character === '"' && next === '"') {
+      current += '"';
+      index += 1;
+    } else if (character === '"') {
+      inQuotes = !inQuotes;
+    } else if (character === ',' && !inQuotes) {
+      values.push(current.trim());
+      current = '';
+    } else {
+      current += character;
+    }
+  }
+
+  values.push(current.trim());
+  return values;
+};
+
+const normalizeCsvHeader = (header = '') => {
+  const key = header.trim().toLowerCase().replace(/[\s_-]+/g, '');
+  const aliases = {
+    studentnumber: 'studentId',
+    studentno: 'studentId',
+    studentid: 'studentId',
+    fullname: 'name',
+    name: 'name',
+    email: 'email',
+    emailaddress: 'email',
+    course: 'course',
+    year: 'year',
+    yearlevel: 'year'
+  };
+  return aliases[key] || key;
+};
+
+const parseCsvRows = (csvText) => {
+  const lines = csvText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return [];
+
+  const firstRow = splitCsvLine(lines[0]).map(normalizeCsvHeader);
+  const hasHeader = firstRow.includes('email') || firstRow.includes('name') || firstRow.includes('studentId');
+  const headers = hasHeader ? firstRow : ['studentId', 'name', 'email', 'year'];
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+
+  return dataLines.map((line) => {
+    const values = splitCsvLine(line);
+    return headers.reduce((row, header, index) => {
+      row[header] = values[index] || '';
+      return row;
+    }, {});
+  });
 };
 
 const AdminMembers = () => {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [pendingSearch, setPendingSearch] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [inactiveSearch, setInactiveSearch] = useState('');
+  const [selectedMembers, setSelectedMembers] = useState({ active: [], inactive: [] });
+  const [addFormData, setAddFormData] = useState(emptyMemberForm);
+  const [csvText, setCsvText] = useState('');
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [feedback, setFeedback] = useState({ type: '', message: '' });
   const [editingMember, setEditingMember] = useState(null);
-  const [editFormData, setEditFormData] = useState({
-    name: '',
-    email: '',
-    studentId: '',
-    course: '',
-    year: '',
-    status: ''
-  });
+  const [editFormData, setEditFormData] = useState({ ...emptyMemberForm, status: 'active' });
   const [saving, setSaving] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
-  const [selectedMembers, setSelectedMembers] = useState({
-    pending: [],
-    active: [],
-    inactive: []
-  });
 
   useEffect(() => {
     loadMembers();
   }, []);
 
+  const mergeMemberRecord = (primary, secondary = {}) => ({
+    ...secondary,
+    ...primary,
+    id: primary.id || secondary.id,
+    sourceIds: {
+      members: [...new Set([...(secondary.sourceIds?.members || []), ...(primary.sourceIds?.members || [])])],
+      users: [...new Set([...(secondary.sourceIds?.users || []), ...(primary.sourceIds?.users || [])])]
+    },
+    fullName: primary.fullName || primary.name || secondary.fullName || secondary.name || '',
+    name: primary.name || primary.fullName || secondary.name || secondary.fullName || '',
+    email: primary.email || secondary.email || '',
+    emailNormalized: primary.emailNormalized || secondary.emailNormalized || normalizeEmail(primary.email || secondary.email || ''),
+    studentId: primary.studentId || secondary.studentId || '',
+    course: primary.course || secondary.course || 'BSIT',
+    year: primary.year || secondary.year || '',
+    status: primary.status || secondary.status || 'active',
+    role: primary.role || secondary.role || 'member',
+    createdAt: primary.createdAt || secondary.createdAt
+  });
+
   const loadMembers = async () => {
+    setLoading(true);
     try {
-      // Get members from members collection
-      const membersQuery = query(collection(db, 'members'), orderBy('createdAt', 'desc'));
-      const membersSnapshot = await getDocs(membersQuery);
-      const membersData = membersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        source: 'members',
-        ...doc.data()
-      }));
+      const [membersSnapshot, usersSnapshot] = await Promise.all([
+        getDocs(query(collection(db, 'members'), orderBy('createdAt', 'desc'))),
+        getDocs(collection(db, 'users'))
+      ]);
 
-      // Get users from users collection (including admins)
-      const usersSnapshot = await getDocs(collection(db, 'users'));
-      const usersRaw = usersSnapshot.docs
-        .map(doc => ({ id: doc.id, source: 'users', ...doc.data() }));
+      const rawRecords = [
+        ...membersSnapshot.docs.map((memberDoc) => ({
+          id: memberDoc.id,
+          sourceIds: { members: [memberDoc.id], users: [] },
+          ...memberDoc.data()
+        })),
+        ...usersSnapshot.docs.map((userDoc) => ({
+          id: userDoc.id,
+          sourceIds: { members: [], users: [userDoc.id] },
+          ...userDoc.data()
+        }))
+      ];
 
-      const nonPrimaryAdmins = usersRaw.filter(user =>
-        user.role === 'admin' && !isPrimaryAdminUser(user)
+      const nonPrimaryAdmins = rawRecords.filter((record) =>
+        record.sourceIds.users.length > 0 && record.role === 'admin' && !isPrimaryAdminUser(record)
       );
 
       if (nonPrimaryAdmins.length > 0) {
-        await Promise.all(nonPrimaryAdmins.map(user =>
-          updateDoc(doc(db, 'users', user.id), {
-            role: 'member',
-            updatedAt: new Date().toISOString()
-          })
+        await Promise.all(nonPrimaryAdmins.flatMap((record) =>
+          record.sourceIds.users.map((userId) =>
+            updateDoc(doc(db, 'users', userId), {
+              role: 'member',
+              updatedAt: new Date().toISOString()
+            })
+          )
         ));
       }
 
-      const usersData = usersRaw
-        .map(user => ({
-          id: user.id,
-          source: 'users',
-          name: user.fullName || user.name || 'N/A',
-          email: user.email || 'N/A',
-          studentId: user.studentId || 'N/A',
-          course: user.course || 'N/A',
-          year: user.year || 'N/A',
-          status: user.status || 'active',
-          role: isPrimaryAdminUser(user) ? 'admin' : 'member',
-          createdAt: user.createdAt
-        }));
-
-      const mergeMemberRecord = (primary, secondary) => ({
-        ...secondary,
-        ...primary,
-        name: primary.name || secondary.name,
-        email: primary.email || secondary.email,
-        studentId: primary.studentId || secondary.studentId,
-        course: primary.course || secondary.course,
-        year: primary.year || secondary.year,
-        status: primary.status || secondary.status,
-        role: primary.role || secondary.role,
-        createdAt: primary.createdAt || secondary.createdAt,
-        source: primary.source || secondary.source
-      });
-
-      // Combine both lists, de-duplicating by user id
       const combinedMap = new Map();
-      membersData.forEach(member => {
-        combinedMap.set(member.id, member);
-      });
-      usersData.forEach(user => {
-        const existing = combinedMap.get(user.id);
-        if (existing) {
-          combinedMap.set(user.id, mergeMemberRecord(existing, user));
-        } else {
-          combinedMap.set(user.id, user);
-        }
+      rawRecords.forEach((record) => {
+        const emailKey = record.emailNormalized || normalizeEmail(record.email);
+        const mergeKey = emailKey || record.id;
+        const normalizedRecord = {
+          ...record,
+          role: isPrimaryAdminUser(record) ? 'admin' : (record.role || 'member')
+        };
+        const existing = combinedMap.get(mergeKey);
+        combinedMap.set(mergeKey, existing ? mergeMemberRecord(normalizedRecord, existing) : normalizedRecord);
       });
 
-      const combinedMembers = Array.from(combinedMap.values()).map((member) => {
-        const { termStartAt, termEndAt } = resolveTermDates(member);
-        const termStartAtIso = termStartAt?.toISOString();
-        const termEndAtIso = termEndAt?.toISOString();
-        return {
-          ...member,
-          termStartAt: member.termStartAt || termStartAtIso,
-          termEndAt: member.termEndAt || termEndAtIso,
-          effectiveStatus: deriveStatus({ ...member, termStartAt, termEndAt })
-        };
-      });
+      const combinedMembers = Array.from(combinedMap.values())
+        .map((member) => {
+          const { termStartAt, termEndAt } = resolveTermDates(member);
+          return {
+            ...member,
+            termStartAt: member.termStartAt || termStartAt?.toISOString(),
+            termEndAt: member.termEndAt || termEndAt?.toISOString(),
+            effectiveStatus: deriveStatus({ ...member, termStartAt, termEndAt })
+          };
+        })
+        .filter((member) => (member.role || 'member') !== 'admin')
+        .sort((a, b) => (a.name || a.email || '').localeCompare(b.name || b.email || ''));
 
       setMembers(combinedMembers);
     } catch (error) {
       console.error('Error loading members:', error);
+      setFeedback({ type: 'error', message: 'Members could not be loaded.' });
     } finally {
       setLoading(false);
     }
   };
 
-  const updateMemberRecords = async (member, data) => {
-    const updates = [
-      updateDoc(doc(db, 'members', member.id), data),
-      updateDoc(doc(db, 'users', member.id), data)
-    ];
+  const buildMemberRecord = (input) => {
+    const email = normalizeEmail(input.email);
+    const now = new Date();
+    const termEndAt = addYears(now, MEMBER_TERM_YEARS);
 
-    await Promise.allSettled(updates);
+    return {
+      userId: getMemberDocId(email),
+      name: (input.name || '').trim(),
+      fullName: (input.name || '').trim(),
+      email,
+      emailNormalized: email,
+      studentId: (input.studentId || '').trim(),
+      course: 'BSIT',
+      year: (input.year || '').trim(),
+      role: 'member',
+      status: 'active',
+      archived: false,
+      authProvider: 'google',
+      termStartAt: now.toISOString(),
+      termEndAt: termEndAt?.toISOString(),
+      termYears: MEMBER_TERM_YEARS,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString()
+    };
+  };
+
+  const saveMemberRecord = async (input) => {
+    const email = normalizeEmail(input.email);
+    if (!email) throw new Error('Email is required.');
+
+    const id = getMemberDocId(email);
+    const record = buildMemberRecord(input);
+
+    await Promise.all([
+      setDoc(doc(db, 'members', id), record, { merge: true }),
+      setDoc(doc(db, 'users', id), record, { merge: true })
+    ]);
+
+    if (record.studentId) {
+      await setDoc(doc(db, 'memberStudentIds', record.studentId), {
+        userId: id,
+        email,
+        emailNormalized: email,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    }
+  };
+
+  const updateMemberRecords = async (member, data) => {
+    const memberIds = member.sourceIds?.members?.length ? member.sourceIds.members : [member.id];
+    const userIds = member.sourceIds?.users?.length ? member.sourceIds.users : [member.id];
+
+    await Promise.allSettled([
+      ...memberIds.map((memberId) => setDoc(doc(db, 'members', memberId), data, { merge: true })),
+      ...userIds.map((userId) => setDoc(doc(db, 'users', userId), data, { merge: true }))
+    ]);
   };
 
   const deleteMemberRecords = async (member) => {
-    const deletes = [
-      deleteDoc(doc(db, 'members', member.id)),
-      deleteDoc(doc(db, 'users', member.id))
-    ];
+    const memberIds = member.sourceIds?.members?.length ? member.sourceIds.members : [member.id];
+    const userIds = member.sourceIds?.users?.length ? member.sourceIds.users : [member.id];
 
-    if (member.studentId) {
-      deletes.push(deleteDoc(doc(db, 'memberStudentIds', String(member.studentId))));
-    }
-
-    await Promise.allSettled(deletes);
+    await Promise.allSettled([
+      ...memberIds.map((memberId) => deleteDoc(doc(db, 'members', memberId))),
+      ...userIds.map((userId) => deleteDoc(doc(db, 'users', userId))),
+      member.studentId ? deleteDoc(doc(db, 'memberStudentIds', String(member.studentId))) : Promise.resolve()
+    ]);
   };
 
-  const handleApprove = async (member, status = 'active') => {
+  const handleAddFormChange = (event) => {
+    setAddFormData((current) => ({ ...current, [event.target.name]: event.target.value }));
+    setFeedback({ type: '', message: '' });
+  };
+
+  const handleAddMember = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setFeedback({ type: '', message: '' });
+
     try {
-      await updateMemberRecords(member, {
-        status,
-        updatedAt: new Date().toISOString()
-      });
-      loadMembers();
+      await saveMemberRecord(addFormData);
+      setAddFormData(emptyMemberForm);
+      setFeedback({ type: 'success', message: 'Member added. They can now sign in with Google.' });
+      await loadMembers();
     } catch (error) {
-      console.error('Error approving member:', error);
+      console.error('Error adding member:', error);
+      setFeedback({ type: 'error', message: error.message || 'Member could not be added.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCsvFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setCsvText(await file.text());
+    setFeedback({ type: '', message: '' });
+  };
+
+  const handleCsvImport = async () => {
+    const rows = parseCsvRows(csvText).filter((row) => normalizeEmail(row.email));
+    if (rows.length === 0) {
+      setFeedback({ type: 'error', message: 'Upload a CSV with at least an email column.' });
+      return;
+    }
+
+    setCsvImporting(true);
+    setFeedback({ type: '', message: '' });
+
+    try {
+      await Promise.all(rows.map(saveMemberRecord));
+      setCsvText('');
+      setFeedback({ type: 'success', message: `${rows.length} member${rows.length === 1 ? '' : 's'} imported.` });
+      await loadMembers();
+    } catch (error) {
+      console.error('Error importing members:', error);
+      setFeedback({ type: 'error', message: error.message || 'CSV import failed.' });
+    } finally {
+      setCsvImporting(false);
     }
   };
 
   const clearSelection = (section) => {
-    setSelectedMembers(prev => ({ ...prev, [section]: [] }));
+    setSelectedMembers((current) => ({ ...current, [section]: [] }));
   };
 
   const toggleMemberSelection = (section, memberId) => {
-    setSelectedMembers(prev => {
-      const selected = prev[section] || [];
+    setSelectedMembers((current) => {
+      const selected = current[section] || [];
       return {
-        ...prev,
+        ...current,
         [section]: selected.includes(memberId)
-          ? selected.filter(id => id !== memberId)
+          ? selected.filter((id) => id !== memberId)
           : [...selected, memberId]
       };
     });
   };
 
   const toggleAllMembers = (section, list) => {
-    setSelectedMembers(prev => {
-      const selected = prev[section] || [];
-      const ids = list.map(member => member.id);
-      const allSelected = ids.length > 0 && ids.every(id => selected.includes(id));
-      return {
-        ...prev,
-        [section]: allSelected ? [] : ids
-      };
+    setSelectedMembers((current) => {
+      const selected = current[section] || [];
+      const ids = list.map((member) => member.id);
+      const allSelected = ids.length > 0 && ids.every((id) => selected.includes(id));
+      return { ...current, [section]: allSelected ? [] : ids };
     });
   };
 
   const runBulkAction = (section, list, action, { title, message }) => {
     const selectedIds = selectedMembers[section] || [];
-    const selectedList = list.filter(member => selectedIds.includes(member.id));
+    const selectedList = list.filter((member) => selectedIds.includes(member.id));
     if (selectedList.length === 0) return;
 
     setConfirmDialog({
@@ -239,47 +392,11 @@ const AdminMembers = () => {
         try {
           await Promise.all(selectedList.map(action));
           clearSelection(section);
-          loadMembers();
+          await loadMembers();
         } catch (error) {
-          console.error('Error running bulk member action:', error);
+          console.error('Error running bulk action:', error);
         } finally {
-          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
-        }
-      }
-    });
-  };
-
-  const handleReject = (member) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Reject Member',
-      message: 'Are you sure you want to reject this member? This action cannot be undone.',
-      onConfirm: async () => {
-        try {
-          await deleteMemberRecords(member);
-          loadMembers();
-        } catch (error) {
-          console.error('Error rejecting member:', error);
-        } finally {
-          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
-        }
-      }
-    });
-  };
-
-  const handleDelete = (member) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Delete Member',
-      message: 'Are you sure you want to delete this member? This action cannot be undone.',
-      onConfirm: async () => {
-        try {
-          await deleteMemberRecords(member);
-          loadMembers();
-        } catch (error) {
-          console.error('Error deleting member:', error);
-        } finally {
-          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+          setConfirmDialog((current) => ({ ...current, isOpen: false }));
         }
       }
     });
@@ -291,53 +408,52 @@ const AdminMembers = () => {
       name: member.name || '',
       email: member.email || '',
       studentId: member.studentId || '',
-      course: member.course || '',
+      course: member.course || 'BSIT',
       year: member.year || '',
-      status: member.status || 'active'
+      status: member.effectiveStatus || member.status || 'active'
     });
   };
 
-  const handleEditFormChange = (e) => {
-    setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
+  const handleEditFormChange = (event) => {
+    setEditFormData((current) => ({ ...current, [event.target.name]: event.target.value }));
   };
 
-  const handleEditSubmit = async (e) => {
-    e.preventDefault();
+  const handleEditSubmit = async (event) => {
+    event.preventDefault();
     if (!editingMember) return;
 
     setSaving(true);
     try {
       const updateData = {
-        name: editFormData.name,
-        studentId: editFormData.studentId,
-        course: editFormData.course,
+        name: editFormData.name.trim(),
+        fullName: editFormData.name.trim(),
+        studentId: editFormData.studentId.trim(),
+        course: 'BSIT',
         year: editFormData.year,
         status: editFormData.status,
         updatedAt: new Date().toISOString()
       };
 
-      // For users collection, also update fullName
-      updateData.fullName = editFormData.name;
-
       const nextStudentId = String(editFormData.studentId || '').trim();
-      const prevStudentId = String(editingMember.studentId || '').trim();
+      const previousStudentId = String(editingMember.studentId || '').trim();
 
       await updateMemberRecords(editingMember, updateData);
 
-      if (prevStudentId && prevStudentId !== nextStudentId) {
-        await deleteDoc(doc(db, 'memberStudentIds', prevStudentId));
+      if (previousStudentId && previousStudentId !== nextStudentId) {
+        await deleteDoc(doc(db, 'memberStudentIds', previousStudentId));
       }
 
-      if (nextStudentId && prevStudentId !== nextStudentId) {
+      if (nextStudentId && previousStudentId !== nextStudentId) {
         await setDoc(doc(db, 'memberStudentIds', nextStudentId), {
           userId: editingMember.id,
-          email: editingMember.email || 'N/A',
+          email: editingMember.email || '',
           emailNormalized: normalizeEmail(editingMember.email || ''),
           updatedAt: new Date().toISOString()
-        });
+        }, { merge: true });
       }
+
       setEditingMember(null);
-      loadMembers();
+      await loadMembers();
     } catch (error) {
       console.error('Error updating member:', error);
     } finally {
@@ -345,101 +461,182 @@ const AdminMembers = () => {
     }
   };
 
-  const handleCloseEditModal = () => {
-    setEditingMember(null);
-    setEditFormData({
-      name: '',
-      email: '',
-      studentId: '',
-      course: '',
-      year: '',
-      status: ''
+  const handleDelete = (member) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Member',
+      message: 'Are you sure you want to delete this member? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await deleteMemberRecords(member);
+          await loadMembers();
+        } catch (error) {
+          console.error('Error deleting member:', error);
+        } finally {
+          setConfirmDialog((current) => ({ ...current, isOpen: false }));
+        }
+      }
     });
   };
 
-  // Filter out admins from the main list
-  const nonAdminMembers = members.filter(member => (member.role || 'member') !== 'admin');
-
-  const pendingMembersList = nonAdminMembers
-    .filter(member => member.effectiveStatus === 'pending')
-    .filter(member => matchesSearch(member, pendingSearch));
-
-  const activeMembersList = nonAdminMembers
-    .filter(member => member.effectiveStatus === 'active')
-    .filter(member => matchesSearch(member, activeSearch));
-
-  const inactiveMembersList = nonAdminMembers
-    .filter(member => member.effectiveStatus === 'inactive')
-    .filter(member => matchesSearch(member, inactiveSearch));
-
-  const totalMembers = nonAdminMembers.length;
-  const pendingMembers = nonAdminMembers.filter(m => m.effectiveStatus === 'pending').length;
-  const activeMembers = nonAdminMembers.filter(m => m.effectiveStatus === 'active').length;
-  const inactiveMembers = nonAdminMembers.filter(m => m.effectiveStatus === 'inactive').length;
-  const adminMembers = members.filter(member => member.role === 'admin');
-  const totalAdmins = adminMembers.length;
-
-  const getStatusBadge = (status) => {
-    if (status === 'active') return 'bg-green-100 text-green-700';
-    if (status === 'pending') return 'bg-yellow-100 text-yellow-700';
-    if (status === 'inactive') return 'bg-gray-100 text-gray-700';
-    return 'bg-gray-100 text-gray-700';
+  const closeEditModal = () => {
+    setEditingMember(null);
+    setEditFormData({ ...emptyMemberForm, status: 'active' });
   };
 
-  const getRoleBadge = (role) => {
-    if (role === 'admin') return 'bg-red-100 text-red-700';
-    return 'bg-blue-100 text-blue-700';
-  };
+  const activeMembersList = members
+    .filter((member) => member.effectiveStatus === 'active')
+    .filter((member) => matchesSearch(member, activeSearch));
 
-  const pendingSelected = selectedMembers.pending.length;
+  const inactiveMembersList = members
+    .filter((member) => member.effectiveStatus === 'inactive')
+    .filter((member) => matchesSearch(member, inactiveSearch));
+
   const activeSelected = selectedMembers.active.length;
   const inactiveSelected = selectedMembers.inactive.length;
 
+  const renderSearch = (value, onChange, placeholder, color = 'blue') => (
+    <div className="relative w-full md:w-72">
+      <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={`w-full rounded-xl border bg-white py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:border-transparent ${
+          color === 'slate'
+            ? 'border-slate-200 focus:ring-slate-400'
+            : 'border-blue-200 focus:ring-blue-400'
+        }`}
+      />
+    </div>
+  );
+
+  const renderMemberTable = (list, section, emptyMessage, headerClass) => (
+    loading ? (
+      <div className="text-center py-12">
+        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+        <p className="text-gray-500">Loading members...</p>
+      </div>
+    ) : list.length === 0 ? (
+      <div className="text-center py-12">
+        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i className="bi bi-people text-3xl text-gray-400" aria-hidden="true"></i>
+        </div>
+        <p className="text-gray-500">{emptyMessage}</p>
+      </div>
+    ) : (
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[860px]">
+          <thead className={headerClass}>
+            <tr>
+              <th className="text-left py-4 px-6 font-semibold text-white">
+                <input
+                  type="checkbox"
+                  checked={list.length > 0 && list.every((member) => selectedMembers[section].includes(member.id))}
+                  onChange={() => toggleAllMembers(section, list)}
+                  className="h-4 w-4 rounded border-white/60"
+                  aria-label={`Select all ${section} members`}
+                />
+              </th>
+              <th className="text-left py-4 px-6 font-semibold text-white">Student #</th>
+              <th className="text-left py-4 px-6 font-semibold text-white">Name</th>
+              <th className="text-left py-4 px-6 font-semibold text-white">Course</th>
+              <th className="text-left py-4 px-6 font-semibold text-white">Year</th>
+              <th className="text-left py-4 px-6 font-semibold text-white">Status</th>
+              <th className="text-left py-4 px-6 font-semibold text-white">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((member, index) => (
+              <tr key={member.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} hover:bg-blue-50/50 transition-colors`}>
+                <td className="py-4 px-6">
+                  <input
+                    type="checkbox"
+                    checked={selectedMembers[section].includes(member.id)}
+                    onChange={() => toggleMemberSelection(section, member.id)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                    aria-label={`Select ${member.name || 'member'}`}
+                  />
+                </td>
+                <td className="py-4 px-6 text-gray-600 font-medium">{member.studentId || 'N/A'}</td>
+                <td className="py-4 px-6">
+                  <p className="font-semibold text-gray-900">{member.name || 'No name'}</p>
+                  <p className="text-sm text-gray-500">{member.email}</p>
+                </td>
+                <td className="py-4 px-6 text-gray-600">{member.course || 'BSIT'}</td>
+                <td className="py-4 px-6 text-gray-600">{member.year || 'N/A'}</td>
+                <td className="py-4 px-6">
+                  <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${member.effectiveStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                    {member.effectiveStatus === 'active' ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td className="py-4 px-6">
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleEditClick(member)}
+                      className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1"
+                    >
+                      <i className="bi bi-pencil-square" aria-hidden="true"></i>
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(member)}
+                      className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors flex items-center gap-1"
+                    >
+                      <i className="bi bi-trash" aria-hidden="true"></i>
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  );
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Manage Members</h1>
-        <p className="text-gray-500 mt-1">View and manage organization members</p>
+        <p className="text-gray-500 mt-1">Add members by Google email or import a CSV file.</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+      {feedback.message && (
+        <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+          feedback.type === 'success'
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+            : 'border-red-200 bg-red-50 text-red-700'
+        }`}>
+          {feedback.message}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+              <i className="bi bi-people-fill text-2xl text-white" aria-hidden="true"></i>
             </div>
             <div>
-              <div className="text-3xl font-bold text-gray-900">{totalMembers}</div>
+              <div className="text-3xl font-bold text-gray-900">{members.length}</div>
               <div className="text-gray-500 text-sm">Total Members</div>
             </div>
           </div>
         </div>
         <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/30">
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-gray-900">{pendingMembers}</div>
-              <div className="text-gray-500 text-sm">Pending Approval</div>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
-          <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <i className="bi bi-check-circle-fill text-2xl text-white" aria-hidden="true"></i>
             </div>
             <div>
-              <div className="text-3xl font-bold text-gray-900">{activeMembers}</div>
+              <div className="text-3xl font-bold text-gray-900">{activeMembersList.length}</div>
               <div className="text-gray-500 text-sm">Active Members</div>
             </div>
           </div>
@@ -447,619 +644,161 @@ const AdminMembers = () => {
         <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-gradient-to-br from-slate-500 to-slate-600 rounded-xl flex items-center justify-center shadow-lg shadow-slate-500/30">
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
+              <i className="bi bi-pause-circle-fill text-2xl text-white" aria-hidden="true"></i>
             </div>
             <div>
-              <div className="text-3xl font-bold text-gray-900">{inactiveMembers}</div>
+              <div className="text-3xl font-bold text-gray-900">{inactiveMembersList.length}</div>
               <div className="text-gray-500 text-sm">Inactive Members</div>
             </div>
           </div>
         </div>
         <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
+            <div className="w-14 h-14 bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/30">
+              <i className="bi bi-google text-2xl text-white" aria-hidden="true"></i>
             </div>
             <div>
-              <div className="text-3xl font-bold text-gray-900">{totalAdmins}</div>
-              <div className="text-gray-500 text-sm">Administrators</div>
+              <div className="text-3xl font-bold text-gray-900">Google</div>
+              <div className="text-gray-500 text-sm">Sign-in Method</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Pending Approval Section */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-amber-50 to-amber-100/50">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-              <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Pending Approval</h2>
-              <p className="text-sm text-gray-500">{pendingMembersList.length} member{pendingMembersList.length !== 1 ? 's' : ''} waiting for approval</p>
-            </div>
-            </div>
-            <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={pendingSelected === 0}
-                  onClick={() => runBulkAction('pending', pendingMembersList, member => updateMemberRecords(member, { status: 'active', updatedAt: new Date().toISOString() }), {
-                    title: 'Approve Selected Members',
-                    message: 'Approve selected pending members?'
-                  })}
-                  className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-                >
-                  Approve Selected
-                </button>
-                <button
-                  type="button"
-                  disabled={pendingSelected === 0}
-                  onClick={() => runBulkAction('pending', pendingMembersList, deleteMemberRecords, {
-                    title: 'Reject Selected Members',
-                    message: 'Reject selected pending members? This cannot be undone.'
-                  })}
-                  className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-                >
-                  Reject Selected
-                </button>
-              </div>
-              <div className="relative w-full md:w-72">
-              <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search pending..."
-                value={pendingSearch}
-                onChange={(e) => setPendingSearch(e.target.value)}
-                className="w-full border border-amber-200 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white"
-              />
-              </div>
-            </div>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <form onSubmit={handleAddMember} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="mb-5">
+            <h2 className="text-xl font-bold text-gray-900">Add Google Member</h2>
+            <p className="text-sm text-gray-500 mt-1">Add an approved student email before they sign in with Google.</p>
           </div>
-        </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <input name="name" value={addFormData.name} onChange={handleAddFormChange} placeholder="Full name" required className="border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input name="email" type="email" value={addFormData.email} onChange={handleAddFormChange} placeholder="student@ua.edu.ph" required className="border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input name="studentId" value={addFormData.studentId} onChange={handleAddFormChange} placeholder="Student number" className="border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <select name="year" value={addFormData.year} onChange={handleAddFormChange} className="border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              <option value="">Select year</option>
+              <option value="1st Year">1st Year</option>
+              <option value="2nd Year">2nd Year</option>
+              <option value="3rd Year">3rd Year</option>
+              <option value="4th Year">4th Year</option>
+            </select>
+            <input
+              name="course"
+              value="BSIT"
+              readOnly
+              className="border-2 border-gray-200 rounded-xl px-4 py-3 bg-gray-50 text-gray-700 md:col-span-2"
+            />
+          </div>
+          <button type="submit" disabled={saving} className="mt-5 w-full rounded-xl bg-gradient-to-r from-blue-900 to-blue-700 px-4 py-3 font-semibold text-white transition-all hover:shadow-lg disabled:from-gray-300 disabled:to-gray-300">
+            {saving ? 'Saving...' : 'Add Member'}
+          </button>
+        </form>
 
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="w-10 h-10 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-            <p className="text-gray-500">Loading...</p>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="mb-5">
+            <h2 className="text-xl font-bold text-gray-900">Import CSV File</h2>
+            <p className="text-sm text-gray-500 mt-1">Use columns: studentId, name, email, year. Course is always BSIT.</p>
           </div>
-        ) : pendingMembersList.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <p className="text-gray-500">No pending approvals</p>
-          </div>
-        ) : (
-          <table className="w-full">
-            <thead className="bg-gradient-to-r from-amber-500 to-amber-600">
-              <tr>
-                <th className="text-left py-4 px-6 font-semibold text-white">
-                  <input
-                    type="checkbox"
-                    checked={pendingMembersList.length > 0 && pendingMembersList.every(member => selectedMembers.pending.includes(member.id))}
-                    onChange={() => toggleAllMembers('pending', pendingMembersList)}
-                    className="h-4 w-4 rounded border-white/60 text-amber-700"
-                    aria-label="Select all pending members"
-                  />
-                </th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Student #</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Name</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Course</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Year</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Status</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendingMembersList.map((member, index) => (
-                <tr key={member.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-amber-50/30'} hover:bg-amber-50 transition-colors`}>
-                  <td className="py-4 px-6">
-                    <input
-                      type="checkbox"
-                      checked={selectedMembers.pending.includes(member.id)}
-                      onChange={() => toggleMemberSelection('pending', member.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-amber-600"
-                      aria-label={`Select ${member.name || 'member'}`}
-                    />
-                  </td>
-                  <td className="py-4 px-6 text-gray-600 font-medium">
-                    {member.studentId || 'N/A'}
-                  </td>
-                  <td className="py-4 px-6">
-                    <div>
-                      <p className="font-semibold text-gray-900">{member.name || 'No name'}</p>
-                      <p className="text-sm text-gray-500">{member.email}</p>
-                    </div>
-                  </td>
-                  <td className="py-4 px-6 text-gray-600">{member.course || 'BSIT'}</td>
-                  <td className="py-4 px-6 text-gray-600">{member.year || 'N/A'}</td>
-                  <td className="py-4 px-6">
-                    <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-yellow-100 text-yellow-700">
-                      Pending
-                    </span>
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleApprove(member, 'active')}
-                        className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-200 transition-colors flex items-center gap-1"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleReject(member)}
-                        className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors flex items-center gap-1"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        Reject
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+          <input type="file" accept=".csv,text/csv" onChange={handleCsvFile} className="w-full rounded-xl border-2 border-dashed border-gray-200 p-4 text-sm text-gray-600" />
+          <textarea
+            value={csvText}
+            onChange={(event) => setCsvText(event.target.value)}
+            placeholder="studentId,name,email,year"
+            rows={7}
+            className="mt-4 w-full resize-none rounded-xl border-2 border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button type="button" onClick={handleCsvImport} disabled={csvImporting || !csvText.trim()} className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300">
+            {csvImporting ? 'Importing...' : 'Import Members'}
+          </button>
+        </div>
       </div>
 
-      {/* Active Members Section */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-blue-100/50">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Active Members</h2>
-              <p className="text-sm text-gray-500">{activeMembersList.length} approved member{activeMembersList.length !== 1 ? 's' : ''}</p>
-            </div>
+              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                <i className="bi bi-people-fill text-blue-600" aria-hidden="true"></i>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Active Members</h2>
+                <p className="text-sm text-gray-500">{activeMembersList.length} active member{activeMembersList.length === 1 ? '' : 's'}</p>
+              </div>
             </div>
             <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={activeSelected === 0}
-                  onClick={() => {
-                    const member = activeMembersList.find(item => item.id === selectedMembers.active[0]);
-                    if (member) handleEditClick(member);
-                  }}
-                  className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-                >
-                  Edit Selected
-                </button>
-                <button
-                  type="button"
-                  disabled={activeSelected === 0}
-                  onClick={() => runBulkAction('active', activeMembersList, deleteMemberRecords, {
-                    title: 'Delete Selected Members',
-                    message: 'Delete selected active members? This cannot be undone.'
-                  })}
-                  className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-                >
-                  Delete Selected
-                </button>
+                <button type="button" disabled={activeSelected !== 1} onClick={() => handleEditClick(activeMembersList.find((member) => member.id === selectedMembers.active[0]))} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300">Edit Selected</button>
+                <button type="button" disabled={activeSelected === 0} onClick={() => runBulkAction('active', activeMembersList, (member) => updateMemberRecords(member, { status: 'inactive', updatedAt: new Date().toISOString() }), { title: 'Deactivate Members', message: 'Deactivate selected members?' })} className="rounded-lg bg-slate-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-gray-300">Deactivate Selected</button>
+                <button type="button" disabled={activeSelected === 0} onClick={() => runBulkAction('active', activeMembersList, deleteMemberRecords, { title: 'Delete Members', message: 'Delete selected members? This cannot be undone.' })} className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300">Delete Selected</button>
               </div>
-              <div className="relative w-full md:w-72">
-              <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search active..."
-                value={activeSearch}
-                onChange={(e) => setActiveSearch(e.target.value)}
-                className="w-full border border-blue-200 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent bg-white"
-              />
-              </div>
+              {renderSearch(activeSearch, setActiveSearch, 'Search active...')}
             </div>
           </div>
         </div>
-
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-            <p className="text-gray-500">Loading members...</p>
-          </div>
-        ) : activeMembersList.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <p className="text-gray-500">No members found</p>
-          </div>
-        ) : (
-          <table className="w-full">
-            <thead className="bg-gradient-to-r from-blue-600 to-blue-700">
-              <tr>
-                <th className="text-left py-4 px-6 font-semibold text-white">
-                  <input
-                    type="checkbox"
-                    checked={activeMembersList.length > 0 && activeMembersList.every(member => selectedMembers.active.includes(member.id))}
-                    onChange={() => toggleAllMembers('active', activeMembersList)}
-                    className="h-4 w-4 rounded border-white/60 text-blue-700"
-                    aria-label="Select all active members"
-                  />
-                </th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Student #</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Name</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Course</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Year</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Status</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Role</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {activeMembersList.map((member, index) => (
-                <tr key={member.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} hover:bg-blue-50/50 transition-colors`}>
-                  <td className="py-4 px-6">
-                    <input
-                      type="checkbox"
-                      checked={selectedMembers.active.includes(member.id)}
-                      onChange={() => toggleMemberSelection('active', member.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600"
-                      aria-label={`Select ${member.name || 'member'}`}
-                    />
-                  </td>
-                  <td className="py-4 px-6 text-gray-600 font-medium">
-                    {member.studentId || 'N/A'}
-                  </td>
-                  <td className="py-4 px-6">
-                    <div>
-                      <p className="font-semibold text-gray-900">{member.name || 'No name'}</p>
-                      <p className="text-sm text-gray-500">{member.email}</p>
-                    </div>
-                  </td>
-                  <td className="py-4 px-6 text-gray-600">{member.course || 'BSIT'}</td>
-                  <td className="py-4 px-6 text-gray-600">{member.year || 'N/A'}</td>
-                  <td className="py-4 px-6">
-                    <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${getStatusBadge(member.effectiveStatus || member.status)}`}>
-                      {member.effectiveStatus === 'active' ? 'Active' : (member.status || 'Active')}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6">
-                    <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${getRoleBadge(member.role)}`}>
-                      {member.role || 'Member'}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEditClick(member)}
-                        className="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(member)}
-                        className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors flex items-center gap-1"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        {renderMemberTable(activeMembersList, 'active', 'No active members found', 'bg-gradient-to-r from-blue-600 to-blue-700')}
       </div>
 
-      {/* Inactive Members Section */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-slate-50 to-slate-100/50">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-                <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
+                <i className="bi bi-pause-circle-fill text-slate-600" aria-hidden="true"></i>
               </div>
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Inactive Members</h2>
-                <p className="text-sm text-gray-500">{inactiveMembersList.length} inactive member{inactiveMembersList.length !== 1 ? 's' : ''}</p>
+                <p className="text-sm text-gray-500">{inactiveMembersList.length} inactive member{inactiveMembersList.length === 1 ? '' : 's'}</p>
               </div>
             </div>
             <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={inactiveSelected === 0}
-                  onClick={() => runBulkAction('inactive', inactiveMembersList, member => updateMemberRecords(member, { status: 'active', updatedAt: new Date().toISOString() }), {
-                    title: 'Activate Selected Members',
-                    message: 'Activate selected inactive members?'
-                  })}
-                  className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-                >
-                  Activate Selected
-                </button>
-                <button
-                  type="button"
-                  disabled={inactiveSelected === 0}
-                  onClick={() => runBulkAction('inactive', inactiveMembersList, deleteMemberRecords, {
-                    title: 'Delete Selected Members',
-                    message: 'Delete selected inactive members? This cannot be undone.'
-                  })}
-                  className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-                >
-                  Delete Selected
-                </button>
+                <button type="button" disabled={inactiveSelected === 0} onClick={() => runBulkAction('inactive', inactiveMembersList, (member) => updateMemberRecords(member, { status: 'active', updatedAt: new Date().toISOString() }), { title: 'Activate Members', message: 'Activate selected members?' })} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300">Activate Selected</button>
+                <button type="button" disabled={inactiveSelected === 0} onClick={() => runBulkAction('inactive', inactiveMembersList, deleteMemberRecords, { title: 'Delete Members', message: 'Delete selected members? This cannot be undone.' })} className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300">Delete Selected</button>
               </div>
-              <div className="relative w-full md:w-72">
-              <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search inactive..."
-                value={inactiveSearch}
-                onChange={(e) => setInactiveSearch(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent bg-white"
-              />
-              </div>
+              {renderSearch(inactiveSearch, setInactiveSearch, 'Search inactive...', 'slate')}
             </div>
           </div>
         </div>
-
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="w-10 h-10 border-4 border-slate-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-            <p className="text-gray-500">Loading inactive members...</p>
-          </div>
-        ) : inactiveMembersList.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <p className="text-gray-500">No inactive members</p>
-          </div>
-        ) : (
-          <table className="w-full">
-            <thead className="bg-gradient-to-r from-slate-600 to-slate-700">
-              <tr>
-                <th className="text-left py-4 px-6 font-semibold text-white">
-                  <input
-                    type="checkbox"
-                    checked={inactiveMembersList.length > 0 && inactiveMembersList.every(member => selectedMembers.inactive.includes(member.id))}
-                    onChange={() => toggleAllMembers('inactive', inactiveMembersList)}
-                    className="h-4 w-4 rounded border-white/60 text-slate-700"
-                    aria-label="Select all inactive members"
-                  />
-                </th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Student #</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Name</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Course</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Year</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Status</th>
-                <th className="text-left py-4 px-6 font-semibold text-white">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {inactiveMembersList.map((member, index) => (
-                <tr key={member.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} hover:bg-slate-50 transition-colors`}>
-                  <td className="py-4 px-6">
-                    <input
-                      type="checkbox"
-                      checked={selectedMembers.inactive.includes(member.id)}
-                      onChange={() => toggleMemberSelection('inactive', member.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-slate-600"
-                      aria-label={`Select ${member.name || 'member'}`}
-                    />
-                  </td>
-                  <td className="py-4 px-6 text-gray-600 font-medium">{member.studentId || 'N/A'}</td>
-                  <td className="py-4 px-6">
-                    <div>
-                      <p className="font-semibold text-gray-900">{member.name || 'No name'}</p>
-                      <p className="text-sm text-gray-500">{member.email}</p>
-                    </div>
-                  </td>
-                  <td className="py-4 px-6 text-gray-600">{member.course || 'BSIT'}</td>
-                  <td className="py-4 px-6 text-gray-600">{member.year || 'N/A'}</td>
-                  <td className="py-4 px-6">
-                    <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${getStatusBadge('inactive')}`}>
-                      Inactive
-                    </span>
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleApprove(member, 'active')}
-                        className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-200 transition-colors flex items-center gap-1"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Activate
-                      </button>
-                      <button
-                        onClick={() => handleDelete(member)}
-                        className="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors flex items-center gap-1"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        {renderMemberTable(inactiveMembersList, 'inactive', 'No inactive members', 'bg-gradient-to-r from-slate-600 to-slate-700')}
       </div>
 
-      {/* Edit Member Modal */}
       {editingMember && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-100">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900">Edit Member</h2>
-                <button
-                  onClick={handleCloseEditModal}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">Edit Member</h2>
+              <button type="button" onClick={closeEditModal} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <i className="bi bi-x-lg" aria-hidden="true"></i>
+              </button>
             </div>
 
             <form onSubmit={handleEditSubmit} className="p-6 space-y-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={editFormData.name}
-                  onChange={handleEditFormChange}
-                  required
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={editFormData.email}
-                  disabled
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 bg-gray-100 text-gray-500 cursor-not-allowed"
-                />
-                <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Student ID
-                </label>
-                <input
-                  type="text"
-                  name="studentId"
-                  value={editFormData.studentId}
-                  onChange={handleEditFormChange}
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                />
-              </div>
-
+              <input name="name" value={editFormData.name} onChange={handleEditFormChange} placeholder="Full name" required className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input name="email" type="email" value={editFormData.email} disabled className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 bg-gray-100 text-gray-500 cursor-not-allowed" />
+              <input name="studentId" value={editFormData.studentId} onChange={handleEditFormChange} placeholder="Student ID" className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Course
-                  </label>
-                  <select
-                    name="course"
-                    value={editFormData.course}
-                    onChange={handleEditFormChange}
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  >
-                    <option value="">Select Course</option>
-                    <option value="BSIT">BSIT</option>
-                    <option value="BSCS">BSCS</option>
-                    <option value="BSIS">BSIS</option>
-                    <option value="ACT">ACT</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Year Level
-                  </label>
-                  <select
-                    name="year"
-                    value={editFormData.year}
-                    onChange={handleEditFormChange}
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  >
-                    <option value="">Select Year</option>
-                    <option value="1st Year">1st Year</option>
-                    <option value="2nd Year">2nd Year</option>
-                    <option value="3rd Year">3rd Year</option>
-                    <option value="4th Year">4th Year</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Status
-                </label>
-                <select
-                  name="status"
-                  value={editFormData.status}
-                  onChange={handleEditFormChange}
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                >
-                  <option value="active">Active</option>
-                  <option value="pending">Pending</option>
-                  <option value="inactive">Inactive</option>
+                <input
+                  name="course"
+                  value="BSIT"
+                  readOnly
+                  className="border-2 border-gray-200 rounded-xl px-4 py-3 bg-gray-50 text-gray-700"
+                />
+                <select name="year" value={editFormData.year} onChange={handleEditFormChange} className="border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  <option value="">Select Year</option>
+                  <option value="1st Year">1st Year</option>
+                  <option value="2nd Year">2nd Year</option>
+                  <option value="3rd Year">3rd Year</option>
+                  <option value="4th Year">4th Year</option>
                 </select>
               </div>
-
+              <select name="status" value={editFormData.status} onChange={handleEditFormChange} className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
               <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={handleCloseEditModal}
-                  className="flex-1 border-2 border-gray-200 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex-1 bg-gradient-to-r from-blue-900 to-blue-700 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 disabled:from-gray-400 disabled:to-gray-400 flex items-center justify-center gap-2"
-                >
-                  {saving ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Save Changes
-                    </>
-                  )}
+                <button type="button" onClick={closeEditModal} className="flex-1 border-2 border-gray-200 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors">Cancel</button>
+                <button type="submit" disabled={saving} className="flex-1 bg-gradient-to-r from-blue-900 to-blue-700 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition-all disabled:from-gray-400 disabled:to-gray-400">
+                  {saving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>
@@ -1069,7 +808,7 @@ const AdminMembers = () => {
 
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
-        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onClose={() => setConfirmDialog((current) => ({ ...current, isOpen: false }))}
         onConfirm={confirmDialog.onConfirm}
         title={confirmDialog.title}
         message={confirmDialog.message}
