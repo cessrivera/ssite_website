@@ -68,9 +68,12 @@ const Login = ({ defaultAdminLogin = false }) => {
 
           const adminData = {
             email: PRIMARY_ADMIN_EMAIL,
+            emailNormalized: PRIMARY_ADMIN_EMAIL,
             role: 'admin',
             name: 'Admin User',
+            fullName: 'Admin User',
             status: 'active',
+            authProvider: 'password',
             updatedAt: new Date().toISOString()
           };
           

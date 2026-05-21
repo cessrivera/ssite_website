@@ -19,11 +19,20 @@ service cloud.firestore {
         && requester().data.role == 'admin';
     }
 
-    function isPrimaryAdmin() {
+    function isPrimaryAdminEmail() {
       return isSignedIn()
-        && requesterExists()
-        && requester().data.role == 'admin'
-        && requester().data.email == 'pderivera.student@ua.edu.ph';
+        && request.auth.token.email is string
+        && request.auth.token.email.lower() == 'pderivera.student@ua.edu.ph';
+    }
+
+    function isPrimaryAdmin() {
+      return isPrimaryAdminEmail()
+        && (
+          !requesterExists()
+          || requester().data.role == 'admin'
+          || requester().data.emailNormalized == 'pderivera.student@ua.edu.ph'
+          || requester().data.email == 'pderivera.student@ua.edu.ph'
+        );
     }
 
     function hasPermission(permission) {
