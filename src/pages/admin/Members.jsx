@@ -226,7 +226,7 @@ const AdminMembers = () => {
       setMembers(combinedMembers);
     } catch (error) {
       console.error('Error loading members:', error);
-      setFeedback({ type: 'error', message: 'Members could not be loaded.' });
+      setFeedback({ type: 'error', message: error.message || 'Members could not be loaded.' });
     } finally {
       setLoading(false);
     }

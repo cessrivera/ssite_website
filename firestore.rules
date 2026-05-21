@@ -14,9 +14,12 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn()
-        && requesterExists()
-        && requester().data.role == 'admin';
+      return isPrimaryAdmin()
+        || (
+          isSignedIn()
+          && requesterExists()
+          && requester().data.role == 'admin'
+        );
     }
 
     function isPrimaryAdminEmail() {
@@ -26,13 +29,7 @@ service cloud.firestore {
     }
 
     function isPrimaryAdmin() {
-      return isPrimaryAdminEmail()
-        && (
-          !requesterExists()
-          || requester().data.role == 'admin'
-          || requester().data.emailNormalized == 'pderivera.student@ua.edu.ph'
-          || requester().data.email == 'pderivera.student@ua.edu.ph'
-        );
+      return isPrimaryAdminEmail();
     }
 
     function hasPermission(permission) {
