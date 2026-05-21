@@ -11,11 +11,11 @@ import { getMembers } from '../../services/memberService';
 import { getMessages } from '../../services/messageService';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import { isFullAdminEmail } from '../../config/adminAccess';
 
-const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
-const isPrimaryAdminUser = (user = {}) =>
-  user.role === 'admin' && normalizeEmail(user.email) === PRIMARY_ADMIN_EMAIL;
+const isFullAdminUser = (user = {}) =>
+  user.role === 'admin' && isFullAdminEmail(user.email);
 
 const COLORS = {
   blue: '#1d4ed8',
@@ -81,10 +81,10 @@ const Analytics = () => {
       const archivedEvents = events.filter(e => e.archived).length;
 
       // Members
-      const adminUsers = users.filter(isPrimaryAdminUser);
+      const adminUsers = users.filter(isFullAdminUser);
       const memberMap = new Map();
       [...users, ...members]
-        .filter(member => !isPrimaryAdminUser(member))
+        .filter(member => !isFullAdminUser(member))
         .forEach(member => {
           const key = member.emailNormalized || normalizeEmail(member.email) || member.id;
           memberMap.set(key, { ...memberMap.get(key), ...member });

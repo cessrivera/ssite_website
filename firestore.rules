@@ -25,7 +25,10 @@ service cloud.firestore {
     function isPrimaryAdminEmail() {
       return isSignedIn()
         && request.auth.token.email is string
-        && request.auth.token.email.lower() == 'pderivera.student@ua.edu.ph';
+        && request.auth.token.email.lower() in [
+          'pderivera.student@ua.edu.ph',
+          'admin@ssite.com'
+        ];
     }
 
     function isPrimaryAdmin() {

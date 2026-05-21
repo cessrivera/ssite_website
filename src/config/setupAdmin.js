@@ -4,21 +4,23 @@
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
-
-const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
+import { FULL_ADMIN_EMAILS, isFullAdminEmail, normalizeAdminEmail } from './adminAccess';
 
 export const createAdminUser = async (email, password) => {
   try {
-    if ((email || '').trim().toLowerCase() !== PRIMARY_ADMIN_EMAIL) {
-      return { success: false, error: `Only ${PRIMARY_ADMIN_EMAIL} can be created as admin.` };
+    const normalizedEmail = normalizeAdminEmail(email);
+
+    if (!isFullAdminEmail(normalizedEmail)) {
+      return { success: false, error: `Only ${FULL_ADMIN_EMAILS.join(' or ')} can be created as admin.` };
     }
 
     // Create user in Firebase Auth
-    const result = await createUserWithEmailAndPassword(auth, PRIMARY_ADMIN_EMAIL, password);
+    const result = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
     
     // Create admin user document in Firestore
     await setDoc(doc(db, 'users', result.user.uid), {
-      email: PRIMARY_ADMIN_EMAIL,
+      email: normalizedEmail,
+      emailNormalized: normalizedEmail,
       role: 'admin',
       name: 'Admin User',
       createdAt: new Date().toISOString(),
@@ -34,4 +36,4 @@ export const createAdminUser = async (email, password) => {
 };
 
 // Example usage:
-// createAdminUser('pderivera.student@ua.edu.ph', 'YourSecurePassword123');
+// createAdminUser('admin@ssite.com', 'YourSecurePassword123');

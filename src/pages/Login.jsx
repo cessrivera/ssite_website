@@ -6,8 +6,8 @@ import { collection, doc, getDoc, getDocs, query, setDoc, where, writeBatch } fr
 import { signOut } from 'firebase/auth';
 import { db } from '../config/firebase';
 import { auth } from '../config/firebase';
+import { FULL_ADMIN_EMAILS, PRIMARY_ADMIN_EMAIL, isFullAdminEmail } from '../config/adminAccess';
 
-const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
 const permissionLandingPages = [
   { permission: 'announcements', path: '/admin/announcements' },
@@ -54,21 +54,21 @@ const Login = ({ defaultAdminLogin = false }) => {
           const permissions = Array.isArray(userData.permissions) ? userData.permissions : [];
           const scopedAdminPath = getPermissionLandingPage(permissions);
 
-          if (normalizedEmail !== PRIMARY_ADMIN_EMAIL && !scopedAdminPath) {
+          if (!isFullAdminEmail(normalizedEmail) && !scopedAdminPath) {
             await signOut(auth);
             setError('This account has no assigned admin page yet.');
             setLoading(false);
             return;
           }
 
-          if (normalizedEmail !== PRIMARY_ADMIN_EMAIL) {
+          if (!isFullAdminEmail(normalizedEmail)) {
             navigate(scopedAdminPath, { replace: true });
             return;
           }
 
           const adminData = {
-            email: PRIMARY_ADMIN_EMAIL,
-            emailNormalized: PRIMARY_ADMIN_EMAIL,
+            email: normalizedEmail,
+            emailNormalized: normalizedEmail,
             role: 'admin',
             name: 'Admin User',
             fullName: 'Admin User',
@@ -88,7 +88,7 @@ const Login = ({ defaultAdminLogin = false }) => {
             await setDoc(userRef, adminData, { merge: true });
           }
 
-          // Demote any other admin accounts to member.
+          // Demote admin documents outside the full-admin allowlist.
           const adminsQuery = query(collection(db, 'users'), where('role', '==', 'admin'));
           const adminsSnapshot = await getDocs(adminsQuery);
           const batch = writeBatch(db);
@@ -97,7 +97,7 @@ const Login = ({ defaultAdminLogin = false }) => {
           adminsSnapshot.forEach((adminDoc) => {
             const data = adminDoc.data();
             const email = normalizeEmail(data.email);
-            if (email !== PRIMARY_ADMIN_EMAIL) {
+            if (!FULL_ADMIN_EMAILS.includes(email)) {
               batch.update(adminDoc.ref, {
                 role: 'member',
                 updatedAt: new Date().toISOString()

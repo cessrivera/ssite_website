@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { collection, deleteDoc, doc, getDocs, orderBy, query, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import { useAuth } from '../../contexts/AuthContext';
+import { isFullAdminEmail } from '../../config/adminAccess';
 
-const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
 const MEMBER_TERM_YEARS = 5;
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
-const isPrimaryAdminUser = (user = {}) =>
-  user.role === 'admin' && normalizeEmail(user.email) === PRIMARY_ADMIN_EMAIL;
+const isFullAdminUser = (user = {}) =>
+  user.role === 'admin' && isFullAdminEmail(user.email);
 
 const emptyMemberForm = {
   name: '',
@@ -124,6 +125,7 @@ const parseCsvRows = (csvText) => {
 };
 
 const AdminMembers = () => {
+  const { currentUser } = useAuth();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeSearch, setActiveSearch] = useState('');
@@ -184,7 +186,7 @@ const AdminMembers = () => {
       ];
 
       const nonPrimaryAdmins = rawRecords.filter((record) =>
-        record.sourceIds.users.length > 0 && record.role === 'admin' && !isPrimaryAdminUser(record)
+        record.sourceIds.users.length > 0 && record.role === 'admin' && !isFullAdminUser(record)
       );
 
       if (nonPrimaryAdmins.length > 0) {
@@ -204,7 +206,7 @@ const AdminMembers = () => {
         const mergeKey = emailKey || record.id;
         const normalizedRecord = {
           ...record,
-          role: isPrimaryAdminUser(record) ? 'admin' : (record.role || 'member')
+          role: isFullAdminUser(record) ? 'admin' : (record.role || 'member')
         };
         const existing = combinedMap.get(mergeKey);
         combinedMap.set(mergeKey, existing ? mergeMemberRecord(normalizedRecord, existing) : normalizedRecord);
@@ -226,7 +228,11 @@ const AdminMembers = () => {
       setMembers(combinedMembers);
     } catch (error) {
       console.error('Error loading members:', error);
-      setFeedback({ type: 'error', message: error.message || 'Members could not be loaded.' });
+      const authEmail = normalizeEmail(currentUser?.email || '');
+      const message = authEmail && !isFullAdminEmail(authEmail)
+        ? `Member management requires a full admin account. You are signed in as ${authEmail}.`
+        : error.message || 'Members could not be loaded.';
+      setFeedback({ type: 'error', message });
     } finally {
       setLoading(false);
     }

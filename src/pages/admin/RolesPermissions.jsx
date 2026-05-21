@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { collection, doc, getDocs, setDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import { isFullAdminEmail } from '../../config/adminAccess';
 
-const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
 const MEMBER_TERM_YEARS = 5;
 
@@ -34,8 +34,8 @@ const deriveStatus = (member = {}) => {
   return 'active';
 };
 
-const isPrimaryAdminUser = (user = {}) =>
-  user.role === 'admin' && normalizeEmail(user.email) === PRIMARY_ADMIN_EMAIL;
+const isFullAdminUser = (user = {}) =>
+  user.role === 'admin' && isFullAdminEmail(user.email);
 
 const mergeMemberRecord = (primary, secondary) => ({
   ...secondary,
@@ -140,7 +140,7 @@ const AdminRolesPermissions = () => {
         combinedMap.set(mergeKey, {
           ...user,
           fullName: user.fullName || user.name,
-          role: isPrimaryAdminUser(user) ? 'admin' : (user.role || 'member')
+          role: isFullAdminUser(user) ? 'admin' : (user.role || 'member')
         });
       });
       membersData.forEach(member => {
@@ -150,7 +150,7 @@ const AdminRolesPermissions = () => {
       });
 
       const users = Array.from(combinedMap.values())
-        .filter(user => !isPrimaryAdminUser(user))
+        .filter(user => !isFullAdminUser(user))
         .filter(user => (user.role || 'member') !== 'admin')
         .map(user => ({ ...user, effectiveStatus: deriveStatus(user) }))
         .filter(user => user.effectiveStatus === 'active')

@@ -8,9 +8,9 @@ import {
 } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
+import { isFullAdminEmail } from '../config/adminAccess';
 
 const AuthContext = createContext();
-const PRIMARY_ADMIN_EMAIL = 'pderivera.student@ua.edu.ph';
 const normalizeEmail = (email = '') => email.trim().toLowerCase();
 const MEMBER_TERM_YEARS = 5;
 const googleProvider = new GoogleAuthProvider();
@@ -241,9 +241,9 @@ export const AuthProvider = ({ children }) => {
         const data = userDoc.data();
         setUserData(data);
         const role = data.role || 'member';
-        const email = normalizeEmail(data.email || authEmail);
+        const email = normalizeEmail(authEmail || data.email);
 
-        if (role === 'admin' && email !== PRIMARY_ADMIN_EMAIL) {
+        if (role === 'admin' && !isFullAdminEmail(email)) {
           return 'member';
         }
 
